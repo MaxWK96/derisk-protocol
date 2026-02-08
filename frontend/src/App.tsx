@@ -711,6 +711,15 @@ contract MyDeFiProtocol {
                 <a href="#integration" className="text-[10px] font-mono text-[#00b894] hover:text-[#00a29b] transition-colors">
                   Integration
                 </a>
+                <span className="text-[#1f2937]">|</span>
+                <a
+                  href="https://github.com/MaxWK96/derisk-protocol"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-mono text-[#00b894] hover:text-[#00a29b] transition-colors"
+                >
+                  GitHub
+                </a>
               </div>
             </footer>
           </div>
