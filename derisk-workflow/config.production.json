@@ -1,0 +1,13 @@
+{
+	"schedule": "0 */5 * * * *",
+	"anthropicApiKey": "YOUR_ANTHROPIC_API_KEY",
+	"defiLlamaUrl": "https://api.llama.fi/tvl/aave-v3",
+	"evms": [
+		{
+			"oracleAddress": "0x0000000000000000000000000000000000000001",
+			"priceFeedAddress": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+			"chainSelectorName": "ethereum-testnet-sepolia",
+			"gasLimit": "500000"
+		}
+	]
+}

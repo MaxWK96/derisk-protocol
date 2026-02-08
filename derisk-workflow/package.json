@@ -1,0 +1,16 @@
+{
+	"name": "derisk-protocol",
+	"version": "1.0.0",
+	"description": "AI-Powered DeFi Risk Oracle - Chainlink Convergence Hackathon 2026",
+	"main": "dist/main.js",
+	"dependencies": {
+		"@chainlink/cre-sdk": "^1.0.7",
+		"@chainlink/functions-toolkit": "^0.3.2",
+		"ethers": "^6.16.0",
+		"viem": "2.34.0",
+		"zod": "3.25.76"
+	},
+	"devDependencies": {
+		"@types/bun": "1.2.21"
+	}
+}

@@ -1,0 +1,23 @@
+# ==========================================================================
+# DeRisk Protocol - CRE Workflow Settings
+# ==========================================================================
+# AI-Powered DeFi Risk Oracle for Chainlink Convergence Hackathon 2026
+# Monitors Aave V3, runs Claude AI risk analysis, writes on-chain
+
+# ==========================================================================
+staging-settings:
+  user-workflow:
+    workflow-name: "derisk-protocol-staging"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.staging.json"
+    secrets-path: ""
+
+# ==========================================================================
+production-settings:
+  user-workflow:
+    workflow-name: "derisk-protocol-production"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.production.json"
+    secrets-path: ""

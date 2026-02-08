@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.bun/
+
+# Build output
+dist/
+out/
+cache/
+.output/
+
+# Environment & secrets
+.env
+.env.*
+secrets.yaml
+*.local
+
+# Foundry
+cache/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Lock files (keep package-lock.json)
+bun.lock
+
+# WASM build artifacts
+derisk-workflow/build/
+derisk-workflow/*.wasm
+max-workflow/*.wasm
+
+# Temp files
+**/tmp.js
+**/tmp.wasm
