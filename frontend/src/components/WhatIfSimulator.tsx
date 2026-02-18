@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 
 // ============================================================================
 // "What If?" Scenario Simulator — interactive sliders for risk modeling
@@ -6,6 +6,7 @@ import { useState, useMemo } from 'react'
 
 interface WhatIfSimulatorProps {
   baseScore: number
+  presetValues?: { usdcDepeg: number; aaveTvlDrop: number; ethPrice: number } | null
 }
 
 function riskColor(s: number) {
@@ -75,11 +76,23 @@ const SLIDERS: SliderConfig[] = [
   },
 ]
 
-export function WhatIfSimulator({ baseScore }: WhatIfSimulatorProps) {
+export function WhatIfSimulator({ baseScore, presetValues }: WhatIfSimulatorProps) {
   const [values, setValues] = useState<Record<string, number>>(() =>
     Object.fromEntries(SLIDERS.map((s) => [s.id, s.defaultVal]))
   )
   const [applied, setApplied] = useState(false)
+
+  // Apply preset values when they change
+  useEffect(() => {
+    if (presetValues) {
+      setValues({
+        usdcDepeg: Math.min(10, Math.max(0, presetValues.usdcDepeg)),
+        aaveTvlDrop: Math.min(50, Math.max(0, presetValues.aaveTvlDrop)),
+        ethPrice: Math.min(60, Math.max(-60, presetValues.ethPrice)),
+      })
+      setApplied(true)
+    }
+  }, [presetValues])
 
   const simulatedScore = useMemo(() => {
     const delta = SLIDERS.reduce((acc, s) => acc + s.riskImpact(values[s.id]), 0)

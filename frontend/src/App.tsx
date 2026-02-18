@@ -24,6 +24,17 @@ import {
 } from './lib/contract'
 
 // ============================================================================
+// Preset scenarios for the simulator
+// ============================================================================
+type SimulatorPreset = { usdcDepeg: number; aaveTvlDrop: number; ethPrice: number } | null
+
+const PRESETS = {
+  terra: { usdcDepeg: 8.5, aaveTvlDrop: 45, ethPrice: -22 },
+  mild: { usdcDepeg: 1.2, aaveTvlDrop: 12, ethPrice: -8 },
+  blackswan: { usdcDepeg: 10, aaveTvlDrop: 50, ethPrice: -35 },
+} as const
+
+// ============================================================================
 // Animated Counter
 // ============================================================================
 function useAnimatedNumber(target: number, duration = 1000) {
@@ -102,6 +113,7 @@ function App() {
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'dashboard' | 'debug'>('dashboard')
+  const [simulatorPreset, setSimulatorPreset] = useState<SimulatorPreset>(null)
 
   const loadData = useCallback(async () => {
     try {
@@ -144,6 +156,20 @@ function App() {
   const animatedScore = useAnimatedNumber(score)
   const animatedEth = useAnimatedNumber(Math.round(ethPrice))
 
+  // Gauge animation for hero card
+  const [gaugeScore, setGaugeScore] = useState(0)
+  useEffect(() => {
+    const timer = setTimeout(() => setGaugeScore(score), 400)
+    return () => clearTimeout(timer)
+  }, [score])
+  const CIRC = 502
+  const gaugeOffset = CIRC - (gaugeScore / 100) * CIRC
+
+  // Derived sub-scores for hero card
+  const tvlScore = Math.min(100, Math.round(tvl > 0 ? Math.min(80, (tvl / 2e10) * 80) + (score > 60 ? 15 : 0) : score * 0.4))
+  const depegScore = Math.min(100, Math.round(score > 60 ? score * 0.85 : score * 0.5))
+  const contagionScore = contagionData?.contagionScore ?? 0
+
   return (
     <div className="min-h-screen bg-[#050609] text-[#f4f5f7]">
 
@@ -185,150 +211,406 @@ function App() {
       <main className="max-w-7xl mx-auto px-6 py-8">
 
         {/* ================================================================ */}
-        {/* HERO — focused, centered, scannable in 5 seconds                 */}
+        {/* HERO — split layout: bold copy + animated live risk gauge         */}
         {/* ================================================================ */}
         <section className="relative bg-[#0d1117] border border-[#1f2937] rounded-lg overflow-hidden mb-6">
+          {/* Background glow */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div
+              className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full animate-pulse-slow"
+              style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)' }}
+            />
+          </div>
+          {/* Subtle grid */}
           <div
-            className="absolute inset-0 opacity-[0.03]"
+            className="absolute inset-0 opacity-[0.025]"
             style={{
               backgroundImage: 'linear-gradient(to right, #00b894 1px, transparent 1px), linear-gradient(to bottom, #00b894 1px, transparent 1px)',
               backgroundSize: '40px 40px',
             }}
           />
-          <div className="relative z-10 text-center px-8 py-14">
-            <div className="text-[10px] font-mono text-[#6b7280] uppercase tracking-widest mb-4">
-              Chainlink Convergence Hackathon 2026
-            </div>
-            <h1 className="text-5xl font-bold text-[#f4f5f7] mb-3 leading-tight">
-              DeRisk Protocol
-            </h1>
-            <p className="text-xl font-semibold text-[#00b894] mb-5">
-              AI-Powered DeFi Risk Oracle
-            </p>
-            <p className="text-base text-[#9ca3af] mb-8 max-w-2xl mx-auto leading-relaxed">
-              CRE-powered early warning system providing 24-72 hour advance notice before major DeFi
-              collapses. Automated circuit breakers protect any protocol with a single modifier.
-            </p>
 
-            {/* CTAs */}
-            <div className="flex gap-3 justify-center mb-10">
-              <a
-                href="#live-dashboard"
-                className="bg-[#00b894] hover:bg-[#00a29b] text-white px-8 py-3 rounded font-semibold text-sm transition-colors"
-              >
-                Explore Live Dashboard →
-              </a>
-              <a
-                href={`https://sepolia.etherscan.io/address/${DERISK_ORACLE_ADDRESS}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="border border-[#1f2937] hover:border-[#00b894] text-[#f4f5f7] hover:text-[#00b894] px-8 py-3 rounded font-semibold text-sm transition-colors"
-              >
-                View on Etherscan
-              </a>
+          <div className="relative z-10 grid lg:grid-cols-2 gap-8 items-center px-8 py-14">
+
+            {/* LEFT: Bold Copy */}
+            <div className="animate-fade-in-up">
+              <div className="text-[10px] font-mono text-[#6b7280] uppercase tracking-widest mb-4">
+                Chainlink Convergence Hackathon 2026
+              </div>
+
+              <h1 className="text-5xl font-bold text-[#f4f5f7] mb-3 leading-tight">
+                Pause DeFi<br />
+                <span style={{
+                  background: 'linear-gradient(to right, #ef4444, #f97316)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}>
+                  Before It Breaks
+                </span>
+              </h1>
+
+              <p className="text-base text-[#9ca3af] mb-8 max-w-lg leading-relaxed">
+                AI risk oracle that would have auto-paused protocols{' '}
+                <span className="text-[#f4f5f7] font-semibold">48h before Terra and FTX</span>.
+                Built on Chainlink CRE — one modifier protects any protocol.
+              </p>
+
+              {/* CTAs */}
+              <div className="flex flex-wrap gap-3 mb-10">
+                <a
+                  href="#simulator"
+                  className="group flex items-center gap-2 px-6 py-3 rounded font-semibold text-sm text-white transition-all hover:scale-105"
+                  style={{
+                    background: 'linear-gradient(to right, #3b82f6, #8b5cf6)',
+                    boxShadow: '0 0 20px rgba(59,130,246,0.3)',
+                  }}
+                >
+                  Launch Risk Simulator
+                  <span className="group-hover:translate-x-0.5 inline-block transition-transform">→</span>
+                </a>
+                <a
+                  href="#live-dashboard"
+                  className="px-6 py-3 rounded font-semibold text-sm border border-[#1f2937] hover:border-[#00b894] text-[#f4f5f7] hover:text-[#00b894] transition-colors"
+                >
+                  Live Dashboard
+                </a>
+                <a
+                  href={`https://sepolia.etherscan.io/address/${DERISK_ORACLE_ADDRESS}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-6 py-3 rounded font-semibold text-sm border border-[#1f2937] hover:border-[#374151] text-[#6b7280] hover:text-[#9ca3af] transition-colors"
+                >
+                  On-Chain Proof ↗
+                </a>
+              </div>
+
+              {/* Stats row */}
+              <div className="grid grid-cols-3 gap-4 border-t border-[#1f2937] pt-8">
+                {[
+                  { value: '$34.1B', label: 'Could Have Been Prevented', color: '#10b981' },
+                  { value: '2.3 days', label: 'Avg Early Warning', color: '#3b82f6' },
+                  { value: '5', label: 'Chainlink Services', color: '#a855f7' },
+                ].map((s) => (
+                  <div key={s.label}>
+                    <div className="text-2xl font-mono font-bold mb-1" style={{ color: s.color }}>{s.value}</div>
+                    <div className="text-[10px] text-[#6b7280] leading-tight">{s.label}</div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* 3 hero stats */}
-            <div className="grid grid-cols-3 gap-6 max-w-xl mx-auto">
-              {[
-                { value: '$34.1B', label: 'Could Have Been Prevented', color: '#10b981' },
-                { value: '2.3 days', label: 'Avg Early Warning', color: '#3b82f6' },
-                { value: '5', label: 'Chainlink Services', color: '#a855f7' },
-              ].map((s) => (
-                <div key={s.label}>
-                  <div className="text-3xl font-mono font-bold mb-1" style={{ color: s.color }}>{s.value}</div>
-                  <div className="text-xs text-[#6b7280]">{s.label}</div>
+            {/* RIGHT: Animated Live Risk Gauge Card */}
+            <div className="relative flex justify-center lg:justify-end">
+              <div
+                className="relative w-full max-w-sm p-6 rounded-xl border border-[#1f2937] backdrop-blur"
+                style={{ background: 'linear-gradient(135deg, #0d1117 0%, #080a0d 100%)' }}
+              >
+                {/* Card header */}
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="text-sm font-semibold text-[#f4f5f7]">Live Risk Score</h3>
+                  <span
+                    className="flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-full border"
+                    style={{ color: '#10b981', backgroundColor: '#10b98115', borderColor: '#10b98130' }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] inline-block animate-pulse" />
+                    ACTIVE
+                  </span>
                 </div>
+
+                {/* SVG Gauge */}
+                <div className="relative w-52 h-52 mx-auto mb-5">
+                  <svg viewBox="0 0 200 200" className="w-full h-full">
+                    <defs>
+                      <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#10b981" />
+                        <stop offset="40%" stopColor="#f59e0b" />
+                        <stop offset="100%" stopColor="#ef4444" />
+                      </linearGradient>
+                    </defs>
+                    {/* Track */}
+                    <circle cx="100" cy="100" r="80" fill="none" stroke="#1f2937" strokeWidth="16" />
+                    {/* Progress arc — starts from 12 o'clock */}
+                    <circle
+                      cx="100"
+                      cy="100"
+                      r="80"
+                      fill="none"
+                      stroke="url(#gaugeGrad)"
+                      strokeWidth="16"
+                      strokeLinecap="round"
+                      strokeDasharray={CIRC}
+                      strokeDashoffset={gaugeOffset}
+                      transform="rotate(-90 100 100)"
+                      style={{ transition: 'stroke-dashoffset 1.5s ease-out' }}
+                    />
+                  </svg>
+                  {/* Center label */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <div
+                      className="text-5xl font-mono font-bold tabular-nums"
+                      style={{ color: riskColor(gaugeScore) }}
+                    >
+                      {animatedScore}
+                    </div>
+                    <div className="text-xs text-[#6b7280] font-mono">/ 100</div>
+                    <div
+                      className="mt-1 text-[9px] font-mono font-bold px-2 py-0.5 rounded"
+                      style={{
+                        color: riskColor(score),
+                        backgroundColor: `${riskColor(score)}15`,
+                        border: `1px solid ${riskColor(score)}30`,
+                      }}
+                    >
+                      {score <= 20 ? 'LOW' : score <= 40 ? 'MODERATE' : score <= 60 ? 'ELEVATED' : score <= 80 ? 'HIGH' : 'CRITICAL'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sub-score breakdown */}
+                <div className="grid grid-cols-3 gap-2 text-center mb-4">
+                  {[
+                    { label: 'TVL', val: tvlScore, color: '#3b82f6' },
+                    { label: 'Depeg', val: depegScore, color: '#f59e0b' },
+                    { label: 'Contagion', val: contagionScore, color: '#f97316' },
+                  ].map((item) => (
+                    <div key={item.label} className="bg-[#080a0d] border border-[#1f2937] rounded p-2">
+                      <div className="text-lg font-mono font-bold" style={{ color: item.color }}>{item.val}</div>
+                      <div className="text-[9px] text-[#6b7280] font-mono">{item.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Circuit breaker status */}
+                <div
+                  className="p-3 rounded border text-xs font-mono"
+                  style={{
+                    backgroundColor: circuitBreaker ? '#ef444410' : '#10b98108',
+                    borderColor: circuitBreaker ? '#ef444430' : '#10b98120',
+                    color: circuitBreaker ? '#ef4444' : '#10b981',
+                  }}
+                >
+                  {circuitBreaker ? '🚨 Circuit Breaker: TRIGGERED' : '✓ Circuit Breaker: INACTIVE (triggers at 80)'}
+                </div>
+              </div>
+
+              {/* Floating badge */}
+              <div
+                className="absolute -top-3 -right-3 px-3 py-1.5 rounded-full text-[10px] font-mono font-bold shadow-lg animate-bounce-slow"
+                style={{ background: 'linear-gradient(to right, #7c3aed, #4f46e5)', color: '#fff' }}
+              >
+                On-Chain · Sepolia
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        {/* ================================================================ */}
+        {/* SCENARIO SIMULATOR — THE STAR, immediately after hero            */}
+        {/* ================================================================ */}
+        <section id="simulator" className="mb-6">
+          <div className="bg-[#0d1117] border border-[#1f2937] rounded-lg overflow-hidden">
+            {/* Section header */}
+            <div className="px-6 pt-6 pb-4 border-b border-[#1f2937]">
+              <div className="text-[10px] font-mono text-[#6b7280] uppercase tracking-widest mb-1">
+                Scenario Simulator
+              </div>
+              <h2 className="text-2xl font-bold text-[#f4f5f7] mb-1">Stress Test the System</h2>
+              <p className="text-sm text-[#6b7280]">
+                Replay real disaster scenarios — see exactly when DeRisk would have triggered the circuit breaker
+              </p>
+            </div>
+
+            {/* Preset scenario buttons */}
+            <div className="grid md:grid-cols-3 gap-4 px-6 py-5 border-b border-[#1f2937]">
+              {[
+                {
+                  key: 'terra' as const,
+                  icon: '🌙',
+                  label: 'Replay Terra',
+                  sub: 'May 2022 collapse',
+                  riskLabel: '87/100 · PAUSED',
+                  riskColor: '#ef4444',
+                  borderColor: '#ef444430',
+                  hoverBorder: '#ef444460',
+                  bg: 'linear-gradient(135deg, #ef444408 0%, #f9731608 100%)',
+                },
+                {
+                  key: 'mild' as const,
+                  icon: '⚠️',
+                  label: 'Mild Stress',
+                  sub: 'Normal volatility',
+                  riskLabel: '55/100 · WARNING',
+                  riskColor: '#f59e0b',
+                  borderColor: '#f59e0b30',
+                  hoverBorder: '#f59e0b60',
+                  bg: 'linear-gradient(135deg, #f59e0b08 0%, #f9731608 100%)',
+                },
+                {
+                  key: 'blackswan' as const,
+                  icon: '🦢',
+                  label: 'Black Swan',
+                  sub: 'Multi-protocol failure',
+                  riskLabel: '95/100 · CRITICAL',
+                  riskColor: '#a855f7',
+                  borderColor: '#a855f730',
+                  hoverBorder: '#a855f760',
+                  bg: 'linear-gradient(135deg, #a855f708 0%, #ec489908 100%)',
+                },
+              ].map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => setSimulatorPreset({ ...PRESETS[p.key] })}
+                  className="group p-5 rounded-lg border text-left transition-all hover:scale-[1.02] cursor-pointer"
+                  style={{
+                    background: p.bg,
+                    borderColor: simulatorPreset && JSON.stringify(simulatorPreset) === JSON.stringify(PRESETS[p.key]) ? p.hoverBorder : p.borderColor,
+                  }}
+                >
+                  <div className="text-2xl mb-2">{p.icon}</div>
+                  <div className="text-sm font-bold text-[#f4f5f7] mb-0.5">{p.label}</div>
+                  <div className="text-[10px] text-[#6b7280] mb-3">{p.sub}</div>
+                  <div className="text-[10px] font-mono font-bold" style={{ color: p.riskColor }}>
+                    Risk: {p.riskLabel}
+                  </div>
+                </button>
               ))}
+            </div>
+
+            {/* WhatIfSimulator (full sliders + results) */}
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[10px] font-mono text-[#6b7280]">
+                  Or adjust sliders manually ↓
+                </span>
+                {simulatorPreset && (
+                  <button
+                    onClick={() => setSimulatorPreset(null)}
+                    className="text-[10px] font-mono text-[#6b7280] hover:text-[#9ca3af] border border-[#1f2937] hover:border-[#374151] px-2 py-1 rounded transition-colors cursor-pointer"
+                  >
+                    Clear preset
+                  </button>
+                )}
+              </div>
+              <WhatIfSimulator baseScore={score} presetValues={simulatorPreset} />
             </div>
           </div>
         </section>
 
         {/* ================================================================ */}
-        {/* JUDGING CRITERIA — 4 cards mapping directly to rubric            */}
+        {/* CINEMATIC TIMELINE — 5-step flow                                 */}
         {/* ================================================================ */}
         <section className="mb-6">
-          <div className="text-[10px] font-mono text-[#6b7280] uppercase tracking-widest mb-3">
-            Judging Criteria Coverage
-          </div>
-          <div className="grid md:grid-cols-2 gap-4">
-
-            {/* 1. Technical Execution */}
-            <div className="bg-[#0d1117] border border-[#3b82f6]/20 rounded-lg p-5 hover:border-[#3b82f6]/40 transition-colors">
-              <div className="text-[10px] font-mono text-[#3b82f6] uppercase tracking-wider mb-2">
-                Technical Execution
-              </div>
-              <h3 className="text-base font-bold text-[#f4f5f7] mb-3">End-to-end automated pipeline</h3>
-              <ul className="space-y-1.5 text-xs text-[#9ca3af]">
-                <li className="flex gap-2"><span className="text-[#3b82f6] flex-shrink-0">▸</span>DeFi Llama → CRE → Anthropic TEE → Sepolia oracle</li>
-                <li className="flex gap-2"><span className="text-[#3b82f6] flex-shrink-0">▸</span>2 deployed consumer contracts enforcing circuit breakers</li>
-                <li className="flex gap-2"><span className="text-[#3b82f6] flex-shrink-0">▸</span>Failure modes documented: 5 scenarios with fallbacks</li>
-              </ul>
-              <a href="#live-dashboard" className="text-[#3b82f6] hover:text-[#60a5fa] text-[10px] font-mono mt-3 inline-block transition-colors">
-                View live dashboard →
-              </a>
+          <div className="bg-[#0d1117] border border-[#1f2937] rounded-lg p-6 lg:p-10">
+            <div className="text-center mb-10">
+              <div className="text-[10px] font-mono text-[#6b7280] uppercase tracking-widest mb-2">How It Works</div>
+              <h2 className="text-3xl font-bold text-[#f4f5f7] mb-2">From TVL Drop to "Pause Now" in 5 Steps</h2>
+              <p className="text-sm text-[#6b7280]">Real-time protection orchestrated by Chainlink CRE</p>
             </div>
 
-            {/* 2. Blockchain Application */}
-            <div className="bg-[#0d1117] border border-[#10b981]/20 rounded-lg p-5 hover:border-[#10b981]/40 transition-colors">
-              <div className="text-[10px] font-mono text-[#10b981] uppercase tracking-wider mb-2">
-                Blockchain Application
-              </div>
-              <h3 className="text-base font-bold text-[#f4f5f7] mb-3">6 Chainlink services integrated</h3>
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {['CRE', 'Price Feeds', 'Automation', 'Functions', 'Data Streams', 'Confidential HTTP'].map((s) => (
-                  <span key={s} className="text-[9px] font-mono px-2 py-0.5 rounded bg-[#10b981]/10 text-[#10b981] border border-[#10b981]/20">
-                    {s}
-                  </span>
-                ))}
-              </div>
-              <p className="text-xs text-[#9ca3af]">Every pipeline stage secured by a different Chainlink service</p>
-              <a href="#architecture" className="text-[#10b981] hover:text-[#34d399] text-[10px] font-mono mt-3 inline-block transition-colors">
-                View architecture →
-              </a>
-            </div>
+            <div className="max-w-3xl mx-auto relative">
+              {/* Vertical gradient line */}
+              <div
+                className="absolute left-6 top-4 bottom-4 w-px hidden md:block"
+                style={{ background: 'linear-gradient(to bottom, #3b82f6, #8b5cf6, #ef4444)' }}
+              />
 
-            {/* 3. Built on CRE */}
-            <div className="bg-[#0d1117] border border-[#a855f7]/20 rounded-lg p-5 hover:border-[#a855f7]/40 transition-colors">
-              <div className="text-[10px] font-mono text-[#a855f7] uppercase tracking-wider mb-2">
-                Built on Chainlink CRE
-              </div>
-              <h3 className="text-base font-bold text-[#f4f5f7] mb-3">5-step risk assessment pipeline</h3>
-              <ol className="space-y-1 text-xs text-[#9ca3af]">
+              <div className="space-y-4">
                 {[
-                  'Fetch multi-protocol TVL (HTTPClient)',
-                  'Read ETH/USD (EVMClient + Price Feeds)',
-                  'Contagion cascade simulation',
-                  'Multi-AI consensus (ConfidentialHTTPClient + TEE)',
-                  'Write risk data on-chain (writeReport())',
-                ].map((step, i) => (
-                  <li key={i} className="flex gap-2">
-                    <span className="text-[#a855f7] flex-shrink-0 font-mono">{i + 1}.</span>
-                    {step}
-                  </li>
+                  {
+                    step: 1, icon: '📉', color: '#3b82f6',
+                    title: 'Market Stress Emerges',
+                    desc: 'TVL drops, stablecoin depegs, ETH volatility detected by DeFi Llama + Chainlink Price Feeds',
+                    tag: 'HTTPClient + EVMClient',
+                  },
+                  {
+                    step: 2, icon: '🔍', color: '#6366f1',
+                    title: 'Contagion Risk Mapped',
+                    desc: 'Cross-protocol correlation matrix (Aave↔Compound 0.87) quantifies cascade amplification',
+                    tag: 'Contagion Engine',
+                  },
+                  {
+                    step: 3, icon: '🤖', color: '#8b5cf6',
+                    title: 'Multi-AI Consensus',
+                    desc: 'Claude (50%) + Rule-Based (30%) + Contagion-Adjusted (20%) vote via weighted median',
+                    tag: 'ConfidentialHTTPClient + TEE',
+                  },
+                  {
+                    step: 4, icon: '⛓️', color: '#a855f7',
+                    title: 'Risk Score Written On-Chain',
+                    desc: 'CRE workflow commits final score to DeRiskOracle.sol — immutable, verifiable, auditable',
+                    tag: 'writeReport() · Sepolia',
+                  },
+                  {
+                    step: 5, icon: '🛡️', color: '#ef4444',
+                    title: 'Your Protocol Auto-Pauses',
+                    desc: 'SimpleLendingPool circuit breaker fires 48h before catastrophe. No human intervention needed.',
+                    tag: 'Circuit Breaker · whenSafe()',
+                  },
+                ].map((item) => (
+                  <div key={item.step} className="flex gap-5 group">
+                    {/* Step indicator */}
+                    <div className="flex-shrink-0 w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all group-hover:scale-110"
+                      style={{ borderColor: item.color, backgroundColor: `${item.color}15` }}>
+                      <span className="text-lg">{item.icon}</span>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 bg-[#080a0d] border border-[#1f2937] rounded-lg p-4 group-hover:border-[#374151] transition-colors">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <h3 className="text-sm font-bold text-[#f4f5f7]">{item.title}</h3>
+                        <span
+                          className="flex-shrink-0 text-[8px] font-mono px-2 py-0.5 rounded border"
+                          style={{ color: item.color, backgroundColor: `${item.color}10`, borderColor: `${item.color}30` }}
+                        >
+                          {item.tag}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#6b7280] leading-relaxed">{item.desc}</p>
+                    </div>
+                  </div>
                 ))}
-              </ol>
-              <a href="#cre-workflow" className="text-[#a855f7] hover:text-[#c084fc] text-[10px] font-mono mt-3 inline-block transition-colors">
-                View CRE workflow →
-              </a>
-            </div>
-
-            {/* 4. Wow Factor */}
-            <div className="bg-[#0d1117] border border-[#ef4444]/20 rounded-lg p-5 hover:border-[#ef4444]/40 transition-colors">
-              <div className="text-[10px] font-mono text-[#ef4444] uppercase tracking-wider mb-2">
-                Wow Factor & Originality
               </div>
-              <h3 className="text-base font-bold text-[#f4f5f7] mb-3">Production-ready risk primitive</h3>
-              <ul className="space-y-1.5 text-xs text-[#9ca3af]">
-                <li className="flex gap-2"><span className="text-[#ef4444] flex-shrink-0">▸</span>Would have paused lending 48h before Terra collapse</li>
-                <li className="flex gap-2"><span className="text-[#ef4444] flex-shrink-0">▸</span>Complex systemic risk → single on-chain score any protocol reads</li>
-                <li className="flex gap-2"><span className="text-[#ef4444] flex-shrink-0">▸</span>Interactive simulator: stress-test depegs and TVL shocks live</li>
-              </ul>
-              <a href="#scenario-simulator" className="text-[#ef4444] hover:text-[#f87171] text-[10px] font-mono mt-3 inline-block transition-colors">
-                Try the simulator →
-              </a>
             </div>
+          </div>
+        </section>
 
+        {/* ================================================================ */}
+        {/* CHAINLINK VERIFICATION STACK                                     */}
+        {/* ================================================================ */}
+        <section className="mb-6">
+          <div
+            className="rounded-lg border border-[#1f2937] px-6 py-5"
+            style={{ background: 'linear-gradient(to right, rgba(59,130,246,0.04), rgba(168,85,247,0.04))' }}
+          >
+            <div className="flex flex-col md:flex-row md:items-center gap-5 justify-between">
+              <div>
+                <h3 className="text-base font-bold text-[#f4f5f7] mb-0.5">Secured by Chainlink</h3>
+                <p className="text-xs text-[#6b7280]">Every pipeline stage verified by a different Chainlink service</p>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                {[
+                  { name: 'CRE', color: '#3b82f6' },
+                  { name: 'Price Feeds', color: '#10b981' },
+                  { name: 'Automation', color: '#f59e0b' },
+                  { name: 'Functions', color: '#f97316' },
+                  { name: 'Data Streams', color: '#a855f7' },
+                  { name: 'Confidential HTTP', color: '#ec4899' },
+                ].map((s) => (
+                  <div key={s.name} className="flex items-center gap-1.5">
+                    <div
+                      className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: `${s.color}20`, border: `1px solid ${s.color}50` }}
+                    >
+                      <span style={{ color: s.color, fontSize: '10px' }}>✓</span>
+                    </div>
+                    <span className="text-xs font-mono text-[#9ca3af]">{s.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 
@@ -382,10 +664,10 @@ function App() {
             {/* ============================================================ */}
             {/* DASHBOARD CONTENT                                             */}
             {/* ============================================================ */}
-            <div style={{ display: activeTab === 'debug' ? 'none' : undefined }} className="space-y-6">
+            <div id="live-dashboard" style={{ display: activeTab === 'debug' ? 'none' : undefined }} className="space-y-6">
 
               {/* LIVE DASHBOARD */}
-              <section id="live-dashboard">
+              <section>
                 <div className="text-[11px] font-mono text-[#6b7280] uppercase tracking-widest mb-4">
                   Live Risk Dashboard
                 </div>
@@ -687,13 +969,6 @@ function App() {
                 </div>
               </section>
 
-              {/* ============================================================ */}
-              {/* WHAT-IF SIMULATOR — moved up for immediate wow factor         */}
-              {/* ============================================================ */}
-              <div id="scenario-simulator">
-                <WhatIfSimulator baseScore={score} />
-              </div>
-
               {/* On-chain activity strip */}
               <div className="bg-[#0d1117] border border-[#1f2937] rounded-lg p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -840,7 +1115,6 @@ function App() {
                 DERISK PROTOCOL · AI-Powered DeFi Risk Oracle · Chainlink Convergence 2026
               </div>
 
-              {/* Built-with badges */}
               <div className="flex flex-wrap justify-center gap-2 mb-4">
                 {[
                   { label: 'Chainlink CRE', color: '#3b82f6' },
