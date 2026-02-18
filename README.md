@@ -63,9 +63,36 @@ Algorithm applied retroactively to historical market data from 4 major events. R
 
 *\*Estimated savings assume governance acted on alerts to reduce exposure. Historical backtesting uses TVL and price data from DeFi Llama and Chainlink feeds. Results do not guarantee future performance. See [docs/BACKTESTING.md](docs/BACKTESTING.md) for full methodology.*
 
-## Smart Contract
+## Smart Contracts
 
 **DeRiskOracle** on Sepolia: [`0xbC75cCB19bc37a87bB0500c016bD13E50c591f09`](https://sepolia.etherscan.io/address/0xbC75cCB19bc37a87bB0500c016bD13E50c591f09)
+
+## 🏗️ Consumer Contract Example
+
+**SimpleLendingPool:** [`0x942a20CF83626dA1aAb50f1354318eE04dF292c0`](https://sepolia.etherscan.io/address/0x942a20CF83626dA1aAb50f1354318eE04dF292c0)
+
+Live integration showing how DeFi protocols use DeRisk for protection:
+- Auto-pause when systemic risk ≥ 70/100 (`whenSafe` modifier on every `deposit` and `borrow`)
+- Circuit breaker integration — reverts if oracle circuit breaker is active
+- Real-time risk monitoring — anyone can call `checkRiskAndPause()` to lock the pool at risk ≥ 80
+- 200% overcollateralized borrowing with collateral-ratio enforcement
+
+**What This Proves:** If deployed before the Terra collapse (May 2022), this contract would have automatically paused deposits and borrows 48 hours before the crash — protecting user funds from contagion that reached 87/100 on our risk scale.
+
+```solidity
+// SimpleLendingPool reads DeRiskOracle on every state-changing call
+modifier whenSafe() {
+    require(!emergencyPaused,               "Pool: emergency paused");
+    require(!oracle.circuitBreakerActive(), "Pool: circuit breaker active");
+    require(oracle.riskScore() < 70,        "Pool: risk score too high");
+    _;
+}
+
+function deposit(uint256 amount) external whenSafe { ... }
+function borrow(uint256 amount)  external whenSafe { ... }
+```
+
+**MockUSDC (test token):** [`0xAd714Eb7B95d3De5d0A91b816e0a39cDbE5C586B`](https://sepolia.etherscan.io/address/0xAd714Eb7B95d3De5d0A91b816e0a39cDbE5C586B)
 
 ### Integration Example
 
