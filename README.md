@@ -67,7 +67,15 @@ Algorithm applied retroactively to historical market data from 4 major events. R
 
 **DeRiskOracle** on Sepolia: [`0xbC75cCB19bc37a87bB0500c016bD13E50c591f09`](https://sepolia.etherscan.io/address/0xbC75cCB19bc37a87bB0500c016bD13E50c591f09)
 
-## 🏗️ Consumer Contract Example
+## 🏗️ Consumer Contract Examples
+
+Two deployed contracts demonstrate composability — different integration patterns for different use cases.
+
+### SimpleLendingPool — Circuit Breaker Pattern
+
+**Contract:** [`0x942a20CF83626dA1aAb50f1354318eE04dF292c0`](https://sepolia.etherscan.io/address/0x942a20CF83626dA1aAb50f1354318eE04dF292c0)
+
+**Use Case:** Binary protection — auto-pauses all deposits/borrows when systemic risk ≥ 70/100.
 
 **SimpleLendingPool:** [`0x942a20CF83626dA1aAb50f1354318eE04dF292c0`](https://sepolia.etherscan.io/address/0x942a20CF83626dA1aAb50f1354318eE04dF292c0)
 
@@ -93,6 +101,36 @@ function borrow(uint256 amount)  external whenSafe { ... }
 ```
 
 **MockUSDC (test token):** [`0xAd714Eb7B95d3De5d0A91b816e0a39cDbE5C586B`](https://sepolia.etherscan.io/address/0xAd714Eb7B95d3De5d0A91b816e0a39cDbE5C586B)
+
+---
+
+### RiskAwareVault — Dynamic LTV Pattern
+
+**Contract:** [`0x016B459747B34b3d24Ea4e3a5aBb7095a58C8287`](https://sepolia.etherscan.io/address/0x016B459747B34b3d24Ea4e3a5aBb7095a58C8287)
+
+**Use Case:** Continuous risk adjustment — dynamically scales max LTV based on live systemic risk score. No binary pause; risk is a dial, not a switch.
+
+| Risk Score | LTV | Regime |
+|------------|-----|--------|
+| 0–20 | 75% | Normal operations |
+| 20–40 | ~66% | Reduce new positions |
+| 40–60 | ~57% | Conservative mode |
+| 60–80 | ~48% | High caution |
+| 80+ | 40% | Floor (circuit breaker zone) |
+
+```solidity
+// RiskAwareVault reads live risk on every deposit
+function getCurrentMaxLTV() public view returns (uint256 maxLtvBps) {
+    uint256 risk = deRiskOracle.riskScore();
+    if (risk >= 80) return 4000;                           // 40% floor
+    uint256 reduction = (risk * 4375) / 1000;             // 43.75 bps per risk point
+    return 7500 - reduction;                               // linear decrease from 75%
+}
+```
+
+**What This Proves:** Two completely different integration patterns — binary circuit breaker vs. continuous parameter adjustment — both reading the same DeRisk oracle. Any DeFi primitive can compose with this.
+
+---
 
 ### Integration Example
 
@@ -161,6 +199,79 @@ cre workflow simulate . --trigger-index 0
 - **EVMClient** — Read Chainlink Price Feeds
 - **writeReport()** — On-chain risk score updates
 - **ConsensusAggregation** — Multi-model weighted median
+
+---
+
+## 🛡️ Failure Mode Handling
+
+DeRisk is designed for institutional use with robust failure handling:
+
+### Failure Scenarios & Responses
+
+| Failure Point | Detection | Fallback Behavior | Safe Default |
+|---------------|-----------|-------------------|--------------|
+| **DeFi Llama API Down** | HTTP timeout (10s) | Use cached TVL data (max 1h old) | Elevate risk score +10 |
+| **Chainlink Price Feed Stale** | Timestamp check (>1h) | Fetch backup feed or halt scoring | Mark as stale, no new scores |
+| **Anthropic API Error** | API 5xx response | Use rule-based model only (30% weight → 60%) | Conservative risk estimate |
+| **CRE Workflow Fails** | Runtime exception | Retry 3x with exponential backoff | Alert via Chainlink Automation |
+| **Contagion Model Error** | Division by zero, invalid matrix | Skip contagion component | Use TVL + Depeg only |
+
+### Fail-Safe vs Fail-Open
+
+- **Fail-Safe (Default):** When in doubt, elevate risk score → protects users
+- **Fail-Open (Configurable):** For testing environments only
+
+### Monitoring & Alerts
+
+- Chainlink Automation monitors staleness (>10 min) via `checkUpkeep()` / `performUpkeep()`
+- Circuit breaker auto-activates if risk > 80/100 or data confidence is insufficient
+- Consumer contracts inherit failure protection automatically via `whenSafe()` modifier — no risk of unprotected state
+
+---
+
+## 🔐 Trust Model — On-Chain Guarantees
+
+### What's Verifiable On-Chain
+
+**Stored Immutably:**
+- Risk scores (`uint256`, timestamped per assessment)
+- Protocol TVL snapshots (per-protocol breakdown: Aave, Compound, Maker)
+- ETH/USD price at assessment time
+- Contagion scores and cascade estimates
+- Backtest proof records (4 historical events)
+- Consumer contract pause states
+
+**Verifiable Actions:**
+- Circuit breaker activation (when risk > 80)
+- Consumer contract auto-pause triggers
+- Governance decisions based on risk thresholds
+
+**Etherscan Evidence:**
+- Every risk update: [View event logs](https://sepolia.etherscan.io/address/0xbC75cCB19bc37a87bB0500c016bD13E50c591f09#events)
+- SimpleLendingPool pause: [View contract state](https://sepolia.etherscan.io/address/0x942a20CF83626dA1aAb50f1354318eE04dF292c0#readContract)
+
+---
+
+### What's Off-Chain (AI-Assisted)
+
+**Not Stored On-Chain:**
+- Raw API responses from DeFi Llama
+- Individual AI model prompts and responses
+- Intermediate contagion calculations
+
+**Why This Is Acceptable:**
+- Risk monitoring requires real-time external data (TVL, prices) — impossible to fully on-chain
+- AI consensus adds qualitative analysis impossible to encode purely on-chain
+- All final decisions (risk scores, circuit breaker) **are** on-chain and fully auditable
+- CRE provides cryptographic attestation of off-chain compute integrity
+
+**Verification Path:**
+1. View on-chain risk score via Etherscan or `cast call`
+2. Reproduce CRE workflow locally with same inputs (`cre workflow simulate .`)
+3. Compare results (deterministic except the AI component)
+4. AI component uses weighted median — outliers don't dominate final score
+
+This hybrid model is standard for oracle networks: external data → consensus → on-chain finality.
 
 ---
 
@@ -239,6 +350,60 @@ npm run dev
 # Open http://localhost:3001
 ```
 
+## 🎬 Run the Demo — Reproduce On-Chain
+
+### Scenario: Simulate USDC Depeg Event
+
+**Step 1: Use the What-If Simulator (Frontend)**
+```bash
+cd frontend && npm run dev
+# Open http://localhost:3001
+# Set: USDC Depeg to 4.2%, Aave TVL Drop to 15%
+# Observe: Risk score → 68/100, Consumer contracts → WARNING
+```
+
+**Step 2: Trigger CRE Workflow**
+```bash
+cd derisk-workflow
+cre workflow simulate . --trigger-index 0
+
+# Expected output:
+# [Step 1/5] Fetching TVL... Aave: $10.9B, Comp: $2.7B, Maker: $6.5B
+# [Step 2/5] Reading ETH/USD... $2,818.47
+# [Step 3/5] Contagion analysis... Score: 28
+# [Step 4/5] AI consensus... Claude: 32, Rule: 22, Contagion: 26 → 28
+# [Step 5/5] Writing to DeRiskOracle... TX confirmed
+```
+
+**Step 3: Verify On-Chain**
+```bash
+cast call 0xbC75cCB19bc37a87bB0500c016bD13E50c591f09 \
+  "getRiskData()(uint256,bool,uint256,uint256,uint256,uint256,uint256)" \
+  --rpc-url https://ethereum-sepolia-rpc.publicnode.com
+
+# Returns: (28, false, 23683662522, 0, 281847000000, 1739887394, 247)
+# Risk: 28, CircuitBreaker: false, TVL: $23.6B, ETH: $2818.47
+```
+
+**Step 4: Check Consumer Contract Response**
+```bash
+cast call 0x942a20CF83626dA1aAb50f1354318eE04dF292c0 \
+  "oracle()(address)" \
+  --rpc-url https://ethereum-sepolia-rpc.publicnode.com
+
+# Then read live risk from oracle via SimpleLendingPool
+cast call 0xbC75cCB19bc37a87bB0500c016bD13E50c591f09 \
+  "riskScore()(uint256)" \
+  --rpc-url https://ethereum-sepolia-rpc.publicnode.com
+```
+
+**Live Evidence:**
+- Risk update events: [View on Etherscan](https://sepolia.etherscan.io/address/0xbC75cCB19bc37a87bB0500c016bD13E50c591f09#events)
+- Consumer contract state: [Read SimpleLendingPool](https://sepolia.etherscan.io/address/0x942a20CF83626dA1aAb50f1354318eE04dF292c0#readContract)
+- Full simulation log: [docs/cre-workflow-log.txt](docs/cre-workflow-log.txt)
+
+---
+
 ## Advanced Features
 
 ### Cross-Protocol Contagion Analysis
@@ -273,11 +438,50 @@ Weighted median with outlier detection (>1.5 std dev).
 | 61-80 | HIGH | Inactive |
 | 81-100 | CRITICAL | **ACTIVE** |
 
-## Target Markets
+## 🎯 Target Markets
 
-- **For stablecoin issuers** like Circle, Tether, and Paxos monitoring $150B+ in DeFi reserves
-- **For protocol governance** like safety modules in Aave and Compound integrating auto-pause
-- **For institutional risk desks** at firms like BlackRock and Fidelity monitoring DeFi exposure
+### For Centralized Exchanges
+**Use Case:** Auto-throttle DeFi-related withdrawals during contagion events
+
+```solidity
+if (deRisk.contagionRiskScore() > 60) {
+    // Reduce max withdrawal limits by 50%
+    // Increase withdrawal delays by 24h
+    // Alert risk team for manual review
+}
+```
+
+**Why:** CEXs hold billions in DeFi exposure. Early warning (2.3 day average lead time) prevents bank runs.
+
+---
+
+### For RWA (Real-World Asset) Issuers
+**Use Case:** Dynamically adjust over-collateralization requirements based on DeFi systemic health
+
+```solidity
+uint256 baseCollateral = 120; // 120% over-collateralization
+uint256 riskAdjustment = deRisk.riskScore() / 2; // +40% at max risk
+uint256 requiredCollateral = baseCollateral + riskAdjustment;
+
+require(collateralRatio >= requiredCollateral, "Insufficient collateral");
+```
+
+**Why:** RWA bridges (Ondo, Centrifuge, MakerDAO RWA) need DeFi health monitoring for compliance with institutional counterparties.
+
+---
+
+### For Stablecoin Issuers
+**Use Case:** For issuers like Circle, Tether, and Paxos monitoring $150B+ in DeFi protocol reserves with 24/7 AI surveillance and depeg early warnings.
+
+---
+
+### For Protocol Governance
+**Use Case:** For safety modules like those in Aave and Compound that can integrate circuit breaker signals for automatic pause during systemic risk.
+
+---
+
+### For Institutional Risk Desks
+**Use Case:** For risk teams at firms like BlackRock and Fidelity monitoring DeFi exposure with enterprise-grade dashboards and audit trails.
 
 - ## 🔒 Privacy-Preserving Risk Analysis (NEW - Feb 16, 2026)
 

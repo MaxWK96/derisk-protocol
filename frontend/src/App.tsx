@@ -8,6 +8,7 @@ import { ConsumerStatus } from './components/ConsumerStatus'
 import { CREWorkflowPanel } from './components/CREWorkflowPanel'
 import { AIConsensusDebug } from './components/AIConsensusDebug'
 import { WhatIfSimulator } from './components/WhatIfSimulator'
+import { SystemHealth } from './components/SystemHealth'
 import {
   fetchRiskData,
   fetchProtocolScores,
@@ -350,6 +351,11 @@ function App() {
                       ))}
                     </div>
                   </div>
+
+                  <SystemHealth
+                    lastUpdateTimestamp={lastUpdate}
+                    riskScore={score}
+                  />
                 </div>
 
                 {/* Right: Metrics */}
