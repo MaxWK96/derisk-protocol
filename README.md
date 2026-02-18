@@ -4,7 +4,7 @@
 
 > Institutional-grade early warning system providing 24-72 hour advance notice before major DeFi collapses. Powered by 5 Chainlink services with multi-AI consensus scoring.
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-00b894?style=for-the-badge)](https://derisk-protocol.vercel.app)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-00b894?style=for-the-badge)](https://frontend-4b4fiyt5o-maxs-projects-64e484e7.vercel.app)
 [![Sepolia Contract](https://img.shields.io/badge/Sepolia-Contract-blue?style=for-the-badge)](https://sepolia.etherscan.io/address/0xbC75cCB19bc37a87bB0500c016bD13E50c591f09)
 
 ---
@@ -374,7 +374,7 @@ contract YourProtocol {
 
 ## Links
 
-- **Live Demo:** [derisk-protocol.vercel.app](https://derisk-protocol.vercel.app)
+- **Live Demo:** [frontend-4b4fiyt5o-maxs-projects-64e484e7.vercel.app](https://frontend-4b4fiyt5o-maxs-projects-64e484e7.vercel.app)
 - **Contract:** [0xbC75...1f09 on Sepolia](https://sepolia.etherscan.io/address/0xbC75cCB19bc37a87bB0500c016bD13E50c591f09)
 - **Backtesting Docs:** [docs/BACKTESTING.md](docs/BACKTESTING.md)
 
