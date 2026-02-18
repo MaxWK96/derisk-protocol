@@ -5,6 +5,9 @@ import { ArchitectureDiagram } from './components/ArchitectureDiagram'
 import { BacktestTimeline } from './components/BacktestTimeline'
 import { RiskBreakdown } from './components/RiskBreakdown'
 import { ConsumerStatus } from './components/ConsumerStatus'
+import { CREWorkflowPanel } from './components/CREWorkflowPanel'
+import { AIConsensusDebug } from './components/AIConsensusDebug'
+import { WhatIfSimulator } from './components/WhatIfSimulator'
 import {
   fetchRiskData,
   fetchProtocolScores,
@@ -68,6 +71,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'debug'>('dashboard')
 
   const loadData = useCallback(async () => {
     try {
@@ -165,13 +169,38 @@ function App() {
             <div className="text-[10px] font-mono text-[#6b7280] uppercase tracking-widest mb-3">
               Chainlink Convergence Hackathon 2026
             </div>
-            <h1 className="text-4xl font-bold text-[#f4f5f7] mb-3 leading-tight">
-              AI-Powered DeFi Risk Oracle
+            <h1 className="text-4xl font-bold text-[#f4f5f7] mb-1 leading-tight">
+              DeRisk Protocol
             </h1>
-            <p className="text-[15px] text-[#9ca3af] mb-8 max-w-2xl leading-relaxed">
-              Institutional-grade early warning system providing 24-72 hour advance notice
-              before major DeFi collapses. Powered by 5 Chainlink services with multi-AI consensus scoring.
+            <h2 className="text-xl font-semibold text-[#00b894] mb-3 leading-tight">
+              AI-Powered DeFi Risk Oracle
+            </h2>
+            <p className="text-[15px] text-[#9ca3af] mb-5 max-w-2xl leading-relaxed">
+              CRE-powered AI risk oracle for automated DeFi safeguards and privacy-preserving risk monitoring.
+              Institutional-grade early warning system providing 24-72 hour advance notice before major collapses.
             </p>
+
+            {/* Prize track badges */}
+            <div className="flex flex-wrap gap-2 mb-8">
+              {[
+                { label: 'Chainlink CRE', color: '#3b82f6' },
+                { label: 'Multi-AI Consensus', color: '#a855f7' },
+                { label: 'Confidential HTTP', color: '#10b981' },
+                { label: 'Circuit Breaker Integration', color: '#ef4444' },
+              ].map((badge) => (
+                <span
+                  key={badge.label}
+                  className="text-[9px] font-mono font-semibold px-2.5 py-1 rounded-full"
+                  style={{
+                    color: badge.color,
+                    backgroundColor: `${badge.color}15`,
+                    border: `1px solid ${badge.color}30`,
+                  }}
+                >
+                  {badge.label}
+                </span>
+              ))}
+            </div>
 
             <div className="grid grid-cols-3 gap-3 mb-8 max-w-lg">
               {[
@@ -233,6 +262,11 @@ function App() {
           </a>
         </section>
 
+        {/* ================================================================ */}
+        {/* CRE WORKFLOW PANEL                                               */}
+        {/* ================================================================ */}
+        <CREWorkflowPanel />
+
         {/* Alerts */}
         {error && (
           <div className="mb-6 p-3 rounded border border-[#f59e0b]/30 bg-[#f59e0b]/5 text-[#f59e0b] text-sm font-mono">
@@ -247,8 +281,36 @@ function App() {
         ) : (
           <div className="space-y-6">
             {/* ================================================================ */}
-            {/* LIVE DASHBOARD                                                   */}
+            {/* TAB NAVIGATION                                                   */}
             {/* ================================================================ */}
+            <div className="flex gap-1 bg-[#080a0d] border border-[#1f2937] rounded-lg p-1 w-fit">
+              {([['dashboard', 'Live Dashboard'], ['debug', 'Debug / Explainability']] as const).map(([tab, label]) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className="px-4 py-1.5 rounded text-[11px] font-mono transition-colors cursor-pointer"
+                  style={{
+                    backgroundColor: activeTab === tab ? '#1f2937' : 'transparent',
+                    color: activeTab === tab ? '#f4f5f7' : '#6b7280',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {activeTab === 'debug' && (
+              <AIConsensusDebug
+                aggregateScore={score}
+                contagionScore={contagionData?.contagionScore ?? 0}
+              />
+            )}
+
+            {/* ================================================================ */}
+            {/* DASHBOARD CONTENT (hidden in debug tab)                          */}
+            {/* ================================================================ */}
+            <div style={{ display: activeTab === 'debug' ? 'none' : undefined }} className="space-y-6">
+            {/* LIVE DASHBOARD */}
             <section id="dashboard">
               <div className="text-[11px] font-mono text-[#6b7280] uppercase tracking-widest mb-4">
                 Live Risk Dashboard
@@ -637,6 +699,80 @@ function App() {
               >
                 View transaction history on Etherscan
               </a>
+            </div>
+
+            {/* ================================================================ */}
+            {/* WHAT IF? SCENARIO SIMULATOR                                      */}
+            {/* ================================================================ */}
+            <WhatIfSimulator baseScore={score} />
+
+            {/* ================================================================ */}
+            {/* PRIVACY SECTION                                                  */}
+            {/* ================================================================ */}
+            <section className="py-8 px-6 bg-gradient-to-br from-[#581c87]/20 via-[#0d1117] to-[#1e3a5f]/20 border border-[#a855f7]/20 rounded-lg">
+              <div className="flex items-center gap-3 mb-6">
+                <span className="text-xl">🔒</span>
+                <div>
+                  <div className="text-[11px] font-mono text-[#6b7280] uppercase tracking-widest">
+                    Privacy & Compliance
+                  </div>
+                  <h2 className="text-lg font-bold text-[#f4f5f7]">Privacy-Preserving Risk Analysis</h2>
+                </div>
+                <span className="ml-auto text-[9px] font-mono text-[#a855f7] px-2 py-0.5 rounded bg-[#a855f7]/10 border border-[#a855f7]/20">
+                  Confidential HTTP + TEE
+                </span>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4 mb-6">
+                {[
+                  {
+                    icon: '🗝',
+                    title: 'Protected Secrets',
+                    desc: 'Anthropic API keys stored in VaultDON — never exposed to DON nodes or visible in transaction data.',
+                  },
+                  {
+                    icon: '🛡',
+                    title: 'Confidential Execution',
+                    desc: 'Risk model prompts and AI responses executed in a Trusted Execution Environment (TEE enclave).',
+                  },
+                  {
+                    icon: '🏦',
+                    title: 'Institutional Ready',
+                    desc: 'Enables regulated entities (RWA issuers, centralized venues) to monitor DeFi exposure without revealing positions.',
+                  },
+                ].map((item) => (
+                  <div key={item.title} className="bg-[#0d1117] border border-[#a855f7]/20 rounded-lg p-5">
+                    <span className="text-2xl mb-3 block">{item.icon}</span>
+                    <h3 className="text-sm font-bold text-[#f4f5f7] mb-2">{item.title}</h3>
+                    <p className="text-xs text-[#9ca3af] leading-relaxed">{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-[#080a0d] border border-[#1f2937] rounded p-4">
+                <div className="text-[9px] font-mono text-[#6b7280] uppercase tracking-wider mb-2">How it works</div>
+                <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono">
+                  <span className="px-2 py-1 rounded bg-[#3b82f6]/10 border border-[#3b82f6]/20 text-[#3b82f6]">
+                    HTTPClient → DeFi Llama (public)
+                  </span>
+                  <span className="text-[#374151]">→</span>
+                  <span className="px-2 py-1 rounded bg-[#a855f7]/10 border border-[#a855f7]/20 text-[#a855f7]">
+                    ConfidentialHTTPClient → Anthropic (TEE)
+                  </span>
+                  <span className="text-[#374151]">→</span>
+                  <span className="px-2 py-1 rounded bg-[#ef4444]/10 border border-[#ef4444]/20 text-[#ef4444]">
+                    writeReport() → on-chain settlement
+                  </span>
+                </div>
+                <p className="text-[9px] text-[#4b5563] mt-3">
+                  Traditional HTTP exposes proprietary risk models to all DON nodes. Chainlink Confidential HTTP isolates sensitive computations in a secure enclave — only the encrypted result is broadcast.
+                </p>
+              </div>
+            </section>
+
+            {/* ================================================================ */}
+            {/* END DASHBOARD WRAPPER                                            */}
+            {/* ================================================================ */}
             </div>
 
             {/* ================================================================ */}

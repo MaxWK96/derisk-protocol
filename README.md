@@ -132,6 +132,76 @@ contract MyDeFiProtocol {
 | `checkUpkeep()` / `performUpkeep()` | Chainlink Automation staleness monitoring |
 | `backtestResults(index)` | On-chain backtest proof records |
 
+## 🔗 CRE Workflow Orchestration
+
+DeRisk uses Chainlink Runtime Environment to orchestrate a 5-step risk assessment pipeline:
+
+### Workflow Steps
+
+| Step | Action | CRE Service | Data Source |
+|------|--------|-------------|-------------|
+| 1 | Fetch multi-protocol TVL | HTTPClient | DeFi Llama API (Aave, Compound, Maker) |
+| 2 | Read ETH/USD price | EVMClient | Chainlink Price Feed (Sepolia) |
+| 3 | Contagion cascade simulation | Internal | Correlation matrix (0.87 Aave↔Compound) |
+| 4 | Multi-AI consensus scoring | ConfidentialHTTPClient | Anthropic Claude API (protected via TEE) |
+| 5 | Write risk data on-chain | writeReport() | DeRiskOracle.sol |
+
+### Reproduce Locally
+```bash
+cd derisk-workflow
+cre workflow simulate . --trigger-index 0
+```
+
+**Evidence:** [View simulation log](docs/cre-workflow-log.txt)
+
+### Key CRE Features Used
+
+- **HTTPClient** — Public data from DeFi Llama
+- **ConfidentialHTTPClient** — Protected AI API calls in TEE
+- **EVMClient** — Read Chainlink Price Feeds
+- **writeReport()** — On-chain risk score updates
+- **ConsensusAggregation** — Multi-model weighted median
+
+---
+
+## 🏆 Prize Track Alignment
+
+### 🎯 Risk & Compliance (Primary Target)
+
+**How DeRisk Fits:**
+- **Automated Risk Monitoring:** Real-time tracking across Aave V3, Compound V3, MakerDAO
+- **Protocol Safeguard Triggers:** SimpleLendingPool auto-pauses at risk > 70/100
+- **Circuit Breaker Integration:** Emergency protection when systemic risk reaches 80/100
+- **Institutional Grade:** Historical backtesting proves 2.3 days average early warning
+
+**Consumer Contract Example:** SimpleLendingPool demonstrates how any DeFi protocol can integrate DeRisk for automated protection.
+
+---
+
+### 🤖 CRE & AI (Strong Fit)
+
+**How DeRisk Fits:**
+- **Multi-AI Consensus:** 3 independent models (Claude AI 50%, Rule-based 30%, Contagion 20%)
+- **AI in the Loop:** Claude API responses directly influence on-chain riskScore
+- **Weighted Median Logic:** Outlier detection (>1.5 std dev) prevents manipulation
+- **CRE Orchestration:** AI calls executed inside CRE workflow, results written on-chain
+
+**Explainability:** Frontend shows per-model scores and consensus decision in Debug tab.
+
+---
+
+### 🔒 Privacy & Compliance
+
+**How DeRisk Fits:**
+- **Confidential HTTP:** All Anthropic API calls use ConfidentialHTTPClient + TEE
+- **Protected Secrets:** API keys stored in VaultDON, never exposed to DON nodes
+- **Private Prompts:** Risk model prompts executed in Trusted Execution Environment
+- **Institutional Use Case:** Enables regulated entities (RWA issuers, centralized venues) to monitor DeFi exposure without revealing positions
+
+**Why This Matters:** Traditional HTTP exposes proprietary risk models. Confidential HTTP isolates sensitive data in a TEE enclave.
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -271,6 +341,36 @@ derisk-protocol/
 | Frontend | React 19, Vite 7, TailwindCSS v4, Recharts |
 | Data | DeFi Llama API, Chainlink Price Feeds |
 | Libraries | @chainlink/cre-sdk, viem, zod |
+
+## 🛠️ For Builders — Integrate in 5 Lines
+
+DeRisk is a reusable primitive. Any DeFi protocol can integrate automated risk protection:
+
+```solidity
+import {IDeRiskOracle} from "./interfaces/IDeRiskOracle.sol";
+
+contract YourProtocol {
+    IDeRiskOracle oracle = IDeRiskOracle(0xbC75cCB19bc37a87bB0500c016bD13E50c591f09);
+
+    modifier whenSafe() {
+        require(oracle.getRiskData().riskScore < 80, "Risk too high");
+        _;
+    }
+
+    function criticalOperation() external whenSafe {
+        // Your logic here — protected by DeRisk
+    }
+}
+```
+
+**That's it.** No API keys, no complex setup. Just read the on-chain risk score.
+
+**Use Cases:**
+- Lending protocols: Pause deposits during systemic risk
+- Stablecoin issuers: Monitor collateral health
+- Institutional treasuries: Auto-hedge based on risk signals
+
+---
 
 ## Links
 
