@@ -182,6 +182,26 @@ Weighted median with outlier detection (>1.5 std dev).
 - **For protocol governance** like safety modules in Aave and Compound integrating auto-pause
 - **For institutional risk desks** at firms like BlackRock and Fidelity monitoring DeFi exposure
 
+- ## 🔒 Privacy-Preserving Risk Analysis (NEW - Feb 16, 2026)
+
+DeRisk now uses **Chainlink Confidential HTTP** to protect proprietary risk data:
+
+**What's Protected:**
+- Anthropic API keys (stored in VaultDON, never exposed to DON nodes)
+- Risk model prompts (executed in TEE enclave)
+- AI responses (processed confidentially before consensus)
+
+**Why This Matters:**
+DeFi protocols use proprietary risk models from credit agencies, institutional data providers, and internal metrics. Regular HTTP exposes API keys and responses to all DON nodes. Confidential HTTP isolates this in a Trusted Execution Environment (TEE).
+
+```
+[1] Fetch public data (DeFi Llama) → HTTPClient
+[2] Fetch proprietary risk scores (Anthropic) → ConfidentialHTTPClient + TEE
+[3] Consensus on final risk score → on-chain settlement
+```
+
+**Targets:** Privacy & Compliance prize category
+
 ## Project Structure
 
 ```
