@@ -1,79 +1,49 @@
+import { riskColor, riskLabel } from '../lib/risk-helpers'
+
 interface RiskGaugeProps {
   score: number
   size?: number
 }
 
 export function RiskGauge({ score, size = 240 }: RiskGaugeProps) {
-  const radius = (size - 24) / 2
-  const circumference = Math.PI * radius
-  const progress = (score / 100) * circumference
-
-  const getColor = (s: number) => {
-    if (s <= 20) return '#10b981'
-    if (s <= 40) return '#f59e0b'
-    if (s <= 60) return '#f97316'
-    if (s <= 80) return '#ef4444'
-    return '#dc2626'
-  }
-
-  const getLabel = (s: number) => {
-    if (s <= 20) return 'LOW'
-    if (s <= 40) return 'MODERATE'
-    if (s <= 60) return 'ELEVATED'
-    if (s <= 80) return 'HIGH'
-    return 'CRITICAL'
-  }
-
-  const color = getColor(score)
-  const center = size / 2
+  const CIRC = 502
+  const offset = CIRC - (score / 100) * CIRC
 
   return (
-    <div className="flex flex-col items-center">
-      <svg width={size} height={size / 2 + 36} viewBox={`0 0 ${size} ${size / 2 + 36}`}>
-        {/* Background arc */}
-        <path
-          d={`M 12 ${center} A ${radius} ${radius} 0 0 1 ${size - 12} ${center}`}
-          fill="none"
-          stroke="#1f2937"
-          strokeWidth="10"
-          strokeLinecap="round"
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg viewBox="0 0 200 200" className="w-full h-full">
+        <defs>
+          <linearGradient id="gaugeGradMain" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="hsl(160, 84%, 39%)" />
+            <stop offset="40%" stopColor="hsl(38, 92%, 50%)" />
+            <stop offset="100%" stopColor="hsl(0, 84%, 60%)" />
+          </linearGradient>
+        </defs>
+        <circle cx="100" cy="100" r="80" fill="none" stroke="#1f2937" strokeWidth="16" />
+        <circle
+          cx="100" cy="100" r="80" fill="none"
+          stroke="url(#gaugeGradMain)" strokeWidth="16" strokeLinecap="round"
+          strokeDasharray={CIRC} strokeDashoffset={offset}
+          transform="rotate(-90 100 100)"
+          style={{ transition: 'stroke-dashoffset 1.5s ease-out' }}
         />
-        {/* Progress arc */}
-        <path
-          d={`M 12 ${center} A ${radius} ${radius} 0 0 1 ${size - 12} ${center}`}
-          fill="none"
-          stroke={color}
-          strokeWidth="10"
-          strokeLinecap="round"
-          strokeDasharray={`${progress} ${circumference}`}
-          style={{ transition: 'stroke-dasharray 1.2s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.5s ease' }}
-        />
-        {/* Score number - monospaced */}
-        <text
-          x={center}
-          y={center - 6}
-          textAnchor="middle"
-          fill="#f4f5f7"
-          fontSize="52"
-          fontWeight="700"
-          fontFamily="'IBM Plex Mono', monospace"
-        >
-          {score}
-        </text>
-        {/* Label */}
-        <text
-          x={center}
-          y={center + 26}
-          textAnchor="middle"
-          fill={color}
-          fontSize="12"
-          fontWeight="600"
-          letterSpacing="3"
-          fontFamily="'IBM Plex Mono', monospace"
-        >
-          {getLabel(score)}
-        </text>
       </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="text-5xl font-mono font-bold tabular-nums" style={{ color: riskColor(score) }}>
+          {score}
+        </div>
+        <div className="text-xs text-muted-foreground font-mono">/ 100</div>
+        <div
+          className="mt-1 text-[9px] font-mono font-bold px-2 py-0.5 rounded"
+          style={{
+            color: riskColor(score),
+            backgroundColor: `${riskColor(score)}15`,
+            border: `1px solid ${riskColor(score)}30`,
+          }}
+        >
+          {riskLabel(score)}
+        </div>
+      </div>
     </div>
   )
 }
