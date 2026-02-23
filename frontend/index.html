@@ -2,12 +2,282 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DeRisk Protocol - AI-Powered DeFi Risk Oracle</title>
+
+    <!-- ── Primary meta ──────────────────────────────────────────────────── -->
+    <title>DeRisk Protocol — Pause DeFi Before It Breaks</title>
+    <meta name="description" content="AI-powered DeFi risk oracle built on Chainlink CRE. Auto-pauses protocols 48h before collapse — would have prevented $34B+ in losses. One modifier: whenSafe()." />
+    <meta name="keywords" content="DeFi risk oracle, Chainlink CRE, circuit breaker, Terra collapse, FTX, USDC depeg, smart contract security, whenSafe, Sepolia" />
+    <link rel="canonical" href="https://derisk-protocol.vercel.app" />
+
+    <!-- ── Open Graph ─────────────────────────────────────────────────────── -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:url"         content="https://derisk-protocol.vercel.app" />
+    <meta property="og:title"       content="DeRisk Protocol — Pause DeFi Before It Breaks" />
+    <meta property="og:description" content="AI risk oracle on Chainlink CRE. Would have auto-paused protocols 48h before Terra and FTX. $34B could have been prevented. Built for Chainlink Convergence Hackathon 2026." />
+    <meta property="og:site_name"   content="DeRisk Protocol" />
+
+    <!-- ── Twitter Card ──────────────────────────────────────────────────── -->
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content="DeRisk Protocol — Pause DeFi Before It Breaks" />
+    <meta name="twitter:description" content="AI risk oracle on Chainlink CRE. One modifier protects any DeFi protocol: whenSafe(). $34B+ could have been prevented." />
+
+    <!-- ── Favicon ───────────────────────────────────────────────────────── -->
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+
+    <!-- ── Prevent flash of white ────────────────────────────────────────── -->
+    <!--
+      Inline CSS covers:
+        1. Dark background so the page is never white before the bundle loads
+        2. Minimal styling for the static shell inside #root
+      React's createRoot().render() replaces #root innerHTML on mount,
+      so this content also acts as a no-JS fallback.
+    -->
+    <style>
+      :root { color-scheme: dark; }
+
+      *, *::before, *::after { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: #0b1017;
+        color: #e2e8f0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ── Static shell ─────────────────────────────────────────────────── */
+      .ss-wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+
+      .ss-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        border-bottom: 1px solid #1a2535;
+        padding: 12px 0;
+        font: 700 11px/1 'Courier New', monospace;
+        letter-spacing: 0.08em;
+      }
+      .ss-brand { color: #10b981; }
+      .ss-sep   { color: #1a2535; }
+      .ss-dim   { color: #475569; font-weight: 400; }
+      .ss-addr  { color: #10b981; text-decoration: none; font-size: 10px; }
+      .ss-addr:hover { text-decoration: underline; }
+
+      .ss-hero {
+        padding: 56px 0 40px;
+        max-width: 680px;
+      }
+      .ss-eyebrow {
+        font: 400 10px/1 'Courier New', monospace;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: #475569;
+        margin: 0 0 16px;
+      }
+      .ss-h1 {
+        font-size: clamp(2rem, 5.5vw, 3.5rem);
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+        margin: 0 0 16px;
+      }
+      .ss-h1 .danger {
+        background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .ss-tagline {
+        font-size: 1rem;
+        color: #8898aa;
+        line-height: 1.7;
+        margin: 0 0 36px;
+      }
+      .ss-tagline strong { color: #e2e8f0; font-weight: 600; }
+
+      .ss-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 32px;
+      }
+      @media (max-width: 500px) {
+        .ss-stats { grid-template-columns: 1fr; }
+      }
+      .ss-stat {
+        background: #111924;
+        border: 1px solid #1a2535;
+        border-radius: 8px;
+        padding: 14px 16px;
+      }
+      .ss-stat-val {
+        font: 700 1.5rem/1 'Courier New', monospace;
+        margin-bottom: 5px;
+      }
+      .ss-stat-label {
+        font-size: 0.68rem;
+        color: #475569;
+        line-height: 1.4;
+      }
+
+      .ss-contract {
+        font: 400 10px/1.6 'Courier New', monospace;
+        background: #111924;
+        border: 1px solid #1a2535;
+        border-radius: 6px;
+        padding: 10px 14px;
+        margin-bottom: 28px;
+        color: #475569;
+        word-break: break-all;
+      }
+      .ss-contract strong { color: #64748b; }
+
+      .ss-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 44px;
+      }
+      .ss-link {
+        display: inline-block;
+        padding: 8px 18px;
+        border: 1px solid #1a2535;
+        border-radius: 6px;
+        font: 400 11px/1 'Courier New', monospace;
+        color: #8898aa;
+        text-decoration: none;
+        background: #111924;
+      }
+      .ss-link:hover { border-color: #10b981; color: #10b981; }
+
+      .ss-loading {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font: 400 11px/1 'Courier New', monospace;
+        color: #334155;
+      }
+      @keyframes ss-spin { to { transform: rotate(360deg); } }
+      .ss-spinner {
+        width: 13px;
+        height: 13px;
+        border: 2px solid #1a2535;
+        border-top-color: #10b981;
+        border-radius: 50%;
+        animation: ss-spin 0.9s linear infinite;
+        flex-shrink: 0;
+      }
+
+      /* noscript notice */
+      .ss-noscript {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #1a1000;
+        border: 1px solid #78350f;
+        border-radius: 6px;
+        padding: 10px 14px;
+        margin-bottom: 20px;
+        font: 400 12px/1.5 'Courier New', monospace;
+        color: #fbbf24;
+      }
+    </style>
   </head>
+
   <body>
-    <div id="root"></div>
+    <!--
+      Static shell in #root.
+      • Renders immediately — no JS, no CSS bundle, no network round-trip.
+      • React's createRoot().render() replaces this content once the bundle
+        executes (typically < 1 s on fast connections).
+      • If JS is disabled entirely, this content remains as the full fallback.
+    -->
+    <div id="root">
+      <div class="ss-wrap">
+
+        <!-- Header -->
+        <header class="ss-header">
+          <span class="ss-brand">DERISK</span>
+          <span class="ss-sep">|</span>
+          <span class="ss-dim">v5.0</span>
+          <span class="ss-sep">|</span>
+          <span class="ss-dim">SEPOLIA</span>
+          <span class="ss-sep">|</span>
+          <a
+            class="ss-addr"
+            href="https://sepolia.etherscan.io/address/0xbC75cCB19bc37a87bB0500c016bD13E50c591f09"
+            target="_blank"
+            rel="noopener noreferrer"
+          >0xbC75...f09 ↗</a>
+        </header>
+
+        <!-- Hero -->
+        <main class="ss-hero">
+          <noscript>
+            <div class="ss-noscript">
+              ⚠ JavaScript is required for the live dashboard. The contract data below is static.
+            </div>
+          </noscript>
+
+          <p class="ss-eyebrow">Chainlink Convergence Hackathon 2026</p>
+
+          <h1 class="ss-h1">
+            Pause DeFi<br>
+            <span class="danger">Before It Breaks</span>
+          </h1>
+
+          <p class="ss-tagline">
+            AI risk oracle that would have auto-paused protocols{' '}
+            <strong>48 hours before Terra and FTX</strong>.
+            Built on Chainlink CRE — one modifier protects any protocol.
+          </p>
+
+          <!-- Key stats -->
+          <div class="ss-stats">
+            <div class="ss-stat">
+              <div class="ss-stat-val" style="color:#10b981">$34.1B</div>
+              <div class="ss-stat-label">Could Have Been Prevented</div>
+            </div>
+            <div class="ss-stat">
+              <div class="ss-stat-val" style="color:#3b82f6">2.3 days</div>
+              <div class="ss-stat-label">Avg Early Warning</div>
+            </div>
+            <div class="ss-stat">
+              <div class="ss-stat-val" style="color:#a855f7">5</div>
+              <div class="ss-stat-label">Chainlink Services Used</div>
+            </div>
+          </div>
+
+          <!-- Contract addresses -->
+          <div class="ss-contract">
+            <strong>DeRiskOracle (Sepolia)</strong><br>
+            0xbC75cCB19bc37a87bB0500c016bD13E50c591f09
+            <br><br>
+            <strong>Network</strong>&nbsp; Ethereum Sepolia Testnet &nbsp;·&nbsp;
+            <strong>Read</strong>&nbsp; riskScore() · circuitBreakerActive() · contagionRiskScore()
+          </div>
+
+          <!-- Links -->
+          <nav class="ss-links" aria-label="External links">
+            <a class="ss-link" href="https://sepolia.etherscan.io/address/0xbC75cCB19bc37a87bB0500c016bD13E50c591f09" target="_blank" rel="noopener noreferrer">🔍 Etherscan ↗</a>
+            <a class="ss-link" href="https://github.com/MaxWK96/derisk-protocol" target="_blank" rel="noopener noreferrer">📄 GitHub ↗</a>
+          </nav>
+
+          <!-- Loading indicator (hidden once React mounts) -->
+          <div class="ss-loading" aria-live="polite">
+            <span class="ss-spinner" aria-hidden="true"></span>
+            Loading live risk data from Sepolia…
+          </div>
+        </main>
+
+      </div>
+    </div>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
