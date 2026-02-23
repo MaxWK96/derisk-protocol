@@ -10,6 +10,9 @@ import { CREWorkflowPanel } from './components/CREWorkflowPanel'
 import { AIConsensusDebug } from './components/AIConsensusDebug'
 import { WhatIfSimulator } from './components/WhatIfSimulator'
 import { SystemHealth } from './components/SystemHealth'
+import { HeroRiskAnimation } from './components/HeroRiskAnimation'
+import { CrisisComparison } from './components/CrisisComparison'
+import { IntegrateSection } from './components/IntegrateSection'
 import { ScrollReveal } from './components/ScrollReveal'
 import { useAnimatedNumber } from './hooks/use-animated-number'
 import { riskColor } from './lib/risk-helpers'
@@ -343,6 +346,13 @@ function App() {
           </div>
         </motion.section>
 
+        {/* HERO RISK ANIMATION */}
+        <ScrollReveal>
+          <section className="mb-6">
+            <HeroRiskAnimation />
+          </section>
+        </ScrollReveal>
+
         {/* SCENARIO SIMULATOR */}
         <ScrollReveal>
           <section id="simulator" className="mb-6">
@@ -518,6 +528,16 @@ function App() {
               </div>
             </div>
           </section>
+        </ScrollReveal>
+
+        {/* CRISIS COMPARISON TABLE */}
+        <ScrollReveal>
+          <CrisisComparison />
+        </ScrollReveal>
+
+        {/* INTEGRATE IN 3 LINES */}
+        <ScrollReveal>
+          <IntegrateSection />
         </ScrollReveal>
 
         {/* CRE WORKFLOW */}

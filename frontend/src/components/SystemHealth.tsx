@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 
+type Status = 'healthy' | 'testnet' | 'failed' | 'simulated'
+
 interface HealthItem {
   id: string
   label: string
   detail: string
-  status: 'healthy' | 'degraded' | 'failed' | 'simulated'
+  status: Status
 }
 
 interface SystemHealthProps {
@@ -12,23 +14,23 @@ interface SystemHealthProps {
   riskScore: number
 }
 
-function statusColor(s: HealthItem['status']) {
+function statusColor(s: Status) {
   if (s === 'healthy') return 'hsl(160, 84%, 39%)'
-  if (s === 'degraded') return 'hsl(38, 92%, 50%)'
+  if (s === 'testnet') return 'hsl(217, 91%, 60%)'
   if (s === 'failed') return 'hsl(0, 84%, 60%)'
   return '#6b7280'
 }
 
-function statusDot(s: HealthItem['status']) {
+function statusDot(s: Status) {
   if (s === 'healthy') return '●'
-  if (s === 'degraded') return '◑'
+  if (s === 'testnet') return '◈'
   if (s === 'failed') return '○'
   return '◌'
 }
 
-function statusLabel(s: HealthItem['status']) {
+function statusLabel(s: Status) {
   if (s === 'healthy') return 'Healthy'
-  if (s === 'degraded') return 'Degraded'
+  if (s === 'testnet') return 'Testnet Demo'
   if (s === 'failed') return 'Failed'
   return 'Simulated'
 }
@@ -60,27 +62,27 @@ export function SystemHealth({ lastUpdateTimestamp, riskScore }: SystemHealthPro
       id: 'defi-llama',
       label: 'DeFi Llama API',
       detail: oracleNeverUpdated
-        ? 'No data yet'
+        ? 'No data yet — testnet mode'
         : oracleStale
-          ? 'Data stale — cache in use'
+          ? 'Data stale — expected on testnet'
           : `Last update ${relativeTime(secondsSinceUpdate)}`,
-      status: oracleNeverUpdated ? 'degraded' : oracleStale ? 'degraded' : 'healthy',
+      status: oracleNeverUpdated ? 'testnet' : oracleStale ? 'testnet' : 'healthy',
     },
     {
       id: 'chainlink-feed',
       label: 'Chainlink Price Feed',
       detail: oracleNeverUpdated
-        ? 'Awaiting oracle data'
+        ? 'Awaiting oracle data — testnet mode'
         : oracleStale
-          ? `Feed stale (${relativeTime(secondsSinceUpdate)})`
+          ? `Feed age ${relativeTime(secondsSinceUpdate)} — normal on Sepolia`
           : `Updated ${relativeTime(secondsSinceUpdate)}`,
-      status: oracleNeverUpdated ? 'degraded' : oracleStale ? 'degraded' : 'healthy',
+      status: oracleNeverUpdated ? 'testnet' : oracleStale ? 'testnet' : 'healthy',
     },
     {
       id: 'ai-consensus',
       label: 'AI Consensus',
       detail: riskScore > 0 ? '3/3 models responding' : 'Awaiting first consensus',
-      status: riskScore > 0 ? 'healthy' : 'degraded',
+      status: riskScore > 0 ? 'healthy' : 'testnet',
     },
     {
       id: 'cre-workflow',
@@ -90,21 +92,43 @@ export function SystemHealth({ lastUpdateTimestamp, riskScore }: SystemHealthPro
     },
   ]
 
-  const healthyCount = items.filter((i) => i.status === 'healthy').length
-
   return (
     <div className="bg-card border border-border rounded-lg p-5">
+      {/* DEMO MODE banner */}
+      <div
+        className="mb-4 p-2.5 rounded-lg border"
+        style={{
+          backgroundColor: 'hsl(217, 91%, 60%, 0.07)',
+          borderColor: 'hsl(217, 91%, 60%, 0.3)',
+        }}
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <span
+            className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded"
+            style={{ backgroundColor: 'hsl(217, 91%, 60%)', color: '#000' }}
+          >
+            DEMO MODE
+          </span>
+          <span className="text-[9px] font-mono font-bold" style={{ color: 'hsl(217, 91%, 60%)' }}>
+            Sepolia Testnet
+          </span>
+        </div>
+        <div className="text-[9px] font-mono leading-relaxed" style={{ color: 'hsl(217, 91%, 80%)' }}>
+          Price feeds may show stale timestamps on testnet. In production Chainlink updates every heartbeat.
+        </div>
+      </div>
+
       <div className="flex items-center justify-between mb-3">
         <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">System Health</div>
         <span
           className="text-[9px] font-mono px-2 py-0.5 rounded border"
           style={{
-            color: healthyCount >= 3 ? 'hsl(160, 84%, 39%)' : 'hsl(38, 92%, 50%)',
-            backgroundColor: healthyCount >= 3 ? 'hsl(160, 84%, 39%, 0.08)' : 'hsl(38, 92%, 50%, 0.08)',
-            borderColor: healthyCount >= 3 ? 'hsl(160, 84%, 39%, 0.3)' : 'hsl(38, 92%, 50%, 0.3)',
+            color: 'hsl(217, 91%, 60%)',
+            backgroundColor: 'hsl(217, 91%, 60%, 0.08)',
+            borderColor: 'hsl(217, 91%, 60%, 0.3)',
           }}
         >
-          {healthyCount}/{items.length} live
+          Testnet Demo
         </span>
       </div>
       <div className="space-y-2.5">
