@@ -10,8 +10,7 @@ import { CREWorkflowPanel } from './components/CREWorkflowPanel'
 import { AIConsensusDebug } from './components/AIConsensusDebug'
 import { WhatIfSimulator } from './components/WhatIfSimulator'
 import { SystemHealth } from './components/SystemHealth'
-import { HeroRiskAnimation } from './components/HeroRiskAnimation'
-import { CrisisComparison } from './components/CrisisComparison'
+import { BeforeAfterStrip } from './components/BeforeAfterStrip'
 import { IntegrateSection } from './components/IntegrateSection'
 import { ScrollReveal } from './components/ScrollReveal'
 import { useAnimatedNumber } from './hooks/use-animated-number'
@@ -346,12 +345,8 @@ function App() {
           </div>
         </motion.section>
 
-        {/* HERO RISK ANIMATION */}
-        <ScrollReveal>
-          <section className="mb-6">
-            <HeroRiskAnimation />
-          </section>
-        </ScrollReveal>
+        {/* BEFORE / AFTER */}
+        <BeforeAfterStrip />
 
         {/* SCENARIO SIMULATOR */}
         <ScrollReveal>
@@ -443,16 +438,16 @@ function App() {
                   style={{ background: 'linear-gradient(to bottom, hsl(217, 91%, 60%), hsl(271, 91%, 65%), hsl(0, 84%, 60%))' }} />
                 <div className="space-y-4">
                   {[
-                    { step: 1, icon: '📉', color: 'hsl(217, 91%, 60%)', title: 'Market Stress Emerges',
-                      desc: 'TVL drops, stablecoin depegs, ETH volatility detected by DeFi Llama + Chainlink Price Feeds', tag: 'HTTPClient + EVMClient' },
+                    { step: 1, icon: '📉', color: 'hsl(217, 91%, 60%)', title: 'Market Stress Detected',
+                      desc: 'TVL drop + stablecoin depeg + ETH volatility — all ingested in real-time.', tag: 'HTTPClient + EVMClient' },
                     { step: 2, icon: '🔍', color: 'hsl(246, 72%, 59%)', title: 'Contagion Risk Mapped',
-                      desc: 'Cross-protocol correlation matrix (Aave↔Compound 0.87) quantifies cascade amplification', tag: 'Contagion Engine' },
+                      desc: 'Aave↔Compound 0.87 correlation. Cascade amplification quantified.', tag: 'Contagion Engine' },
                     { step: 3, icon: '🤖', color: 'hsl(271, 91%, 65%)', title: 'Multi-AI Consensus',
-                      desc: 'Claude (50%) + Rule-Based (30%) + Contagion-Adjusted (20%) vote via weighted median', tag: 'ConfidentialHTTPClient + TEE' },
-                    { step: 4, icon: '⛓️', color: 'hsl(271, 91%, 65%)', title: 'Risk Score Written On-Chain',
-                      desc: 'CRE workflow commits final score to DeRiskOracle.sol — immutable, verifiable, auditable', tag: 'writeReport() · Sepolia' },
-                    { step: 5, icon: '🛡️', color: 'hsl(0, 84%, 60%)', title: 'Your Protocol Auto-Pauses',
-                      desc: 'SimpleLendingPool circuit breaker fires 48h before catastrophe. No human intervention needed.', tag: 'Circuit Breaker · whenSafe()' },
+                      desc: 'Claude + rule-based + contagion model vote. Weighted median, outlier-resistant.', tag: 'ConfidentialHTTPClient + TEE' },
+                    { step: 4, icon: '⛓️', color: 'hsl(271, 91%, 65%)', title: 'Score Written On-Chain',
+                      desc: 'Final score committed to DeRiskOracle.sol — immutable, on-chain, auditable.', tag: 'writeReport() · Sepolia' },
+                    { step: 5, icon: '🛡️', color: 'hsl(0, 84%, 60%)', title: 'Protocol Auto-Pauses',
+                      desc: 'whenSafe() fires 48h early. No human intervention needed.', tag: 'Circuit Breaker · whenSafe()' },
                   ].map((item, idx) => (
                     <ScrollReveal key={item.step} delay={idx * 0.1}>
                       <div className="flex gap-4 sm:gap-5 group">
@@ -528,11 +523,6 @@ function App() {
               </div>
             </div>
           </section>
-        </ScrollReveal>
-
-        {/* CRISIS COMPARISON TABLE */}
-        <ScrollReveal>
-          <CrisisComparison />
         </ScrollReveal>
 
         {/* INTEGRATE IN 3 LINES */}
