@@ -237,27 +237,28 @@ function App() {
                 </a>
               </div>
 
-              {/* Stats with glow cards */}
-              <div className="grid grid-cols-3 gap-3 sm:gap-4 border-t border-border pt-8">
-                {[
-                  { value: '$34.1B', label: 'Could Have Been Prevented', color: 'hsl(160, 84%, 39%)', glowColor: 'rgba(16,185,129,0.15)' },
-                  { value: '2.3 days', label: 'Avg Early Warning', color: 'hsl(217, 91%, 60%)', glowColor: 'rgba(59,130,246,0.15)' },
-                  { value: '5', label: 'Chainlink Services Used', color: 'hsl(271, 91%, 65%)', glowColor: 'rgba(168,85,247,0.15)' },
-                ].map((s, i) => (
-                  <motion.div
-                    key={s.label}
-                    className="stat-card bg-muted/50 border border-border rounded-lg p-3 sm:p-4 transition-all group"
-                    style={{ '--glow-color': s.glowColor } as React.CSSProperties}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.5 + i * 0.1 }}
-                    whileHover={{ boxShadow: `0 0 25px ${s.glowColor}` }}
-                  >
-                    <div className="text-xl sm:text-2xl font-mono font-bold mb-1 transition-transform group-hover:scale-105" style={{ color: s.color }}>{s.value}</div>
-                    <div className="text-[9px] sm:text-[10px] text-muted-foreground leading-tight">{s.label}</div>
-                  </motion.div>
-                ))}
-              </div>
+              {/* Primary hero claim */}
+              <motion.div
+                className="border-t border-border pt-8"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.5 }}
+              >
+                <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-3">
+                  Backtested · Terra May 2022
+                </div>
+                <p className="text-lg sm:text-xl font-semibold text-derisk-text-secondary leading-snug mb-1">
+                  Would have flagged the collapse{' '}
+                  <span className="text-foreground">48 hours early.</span>
+                </p>
+                <p className="text-3xl sm:text-4xl font-bold leading-tight">
+                  <span style={{ color: 'hsl(0, 84%, 62%)' }}>$40B</span>
+                  <span className="text-foreground"> in losses preventable.</span>
+                </p>
+                <p className="text-[10px] font-mono text-muted-foreground mt-3">
+                  Also: FTX Nov 2022 · USDC Depeg Mar 2023 · ~$21B combined DeFi exposure
+                </p>
+              </motion.div>
             </motion.div>
 
             {/* Live Risk Gauge Card */}

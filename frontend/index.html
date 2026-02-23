@@ -100,30 +100,6 @@
       }
       .ss-tagline strong { color: #e2e8f0; font-weight: 600; }
 
-      .ss-stats {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        margin-bottom: 32px;
-      }
-      @media (max-width: 500px) {
-        .ss-stats { grid-template-columns: 1fr; }
-      }
-      .ss-stat {
-        background: #111924;
-        border: 1px solid #1a2535;
-        border-radius: 8px;
-        padding: 14px 16px;
-      }
-      .ss-stat-val {
-        font: 700 1.5rem/1 'Courier New', monospace;
-        margin-bottom: 5px;
-      }
-      .ss-stat-label {
-        font-size: 0.68rem;
-        color: #475569;
-        line-height: 1.4;
-      }
 
       .ss-contract {
         font: 400 10px/1.6 'Courier New', monospace;
@@ -171,6 +147,40 @@
         border-radius: 50%;
         animation: ss-spin 0.9s linear infinite;
         flex-shrink: 0;
+      }
+
+      /* Primary hero claim */
+      .ss-claim {
+        border-top: 1px solid #1a2535;
+        padding-top: 28px;
+        margin-bottom: 28px;
+      }
+      .ss-claim-eyebrow {
+        font: 400 10px/1 'Courier New', monospace;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: #475569;
+        margin-bottom: 10px;
+      }
+      .ss-claim-setup {
+        font-size: clamp(1rem, 2.5vw, 1.2rem);
+        font-weight: 600;
+        color: #8898aa;
+        line-height: 1.4;
+        margin: 0 0 4px;
+      }
+      .ss-claim-setup-em { color: #e2e8f0; font-weight: 700; }
+      .ss-claim-punchline {
+        font-size: clamp(1.75rem, 5vw, 2.5rem);
+        font-weight: 800;
+        line-height: 1.15;
+        color: #e2e8f0;
+        margin: 0 0 10px;
+      }
+      .ss-claim-num { color: #ef4444; }
+      .ss-claim-footnote {
+        font: 400 10px/1 'Courier New', monospace;
+        color: #475569;
       }
 
       /* noscript notice */
@@ -237,20 +247,19 @@
             Built on Chainlink CRE — one modifier protects any protocol.
           </p>
 
-          <!-- Key stats -->
-          <div class="ss-stats">
-            <div class="ss-stat">
-              <div class="ss-stat-val" style="color:#10b981">$34.1B</div>
-              <div class="ss-stat-label">Could Have Been Prevented</div>
-            </div>
-            <div class="ss-stat">
-              <div class="ss-stat-val" style="color:#3b82f6">2.3 days</div>
-              <div class="ss-stat-label">Avg Early Warning</div>
-            </div>
-            <div class="ss-stat">
-              <div class="ss-stat-val" style="color:#a855f7">5</div>
-              <div class="ss-stat-label">Chainlink Services Used</div>
-            </div>
+          <!-- Primary hero claim -->
+          <div class="ss-claim">
+            <div class="ss-claim-eyebrow">Backtested · Terra May 2022</div>
+            <p class="ss-claim-setup">
+              Would have flagged the collapse
+              <strong class="ss-claim-setup-em">48 hours early.</strong>
+            </p>
+            <p class="ss-claim-punchline">
+              <span class="ss-claim-num">$40B</span> in losses preventable.
+            </p>
+            <p class="ss-claim-footnote">
+              Also: FTX Nov 2022 · USDC Depeg Mar 2023 · ~$21B combined DeFi exposure
+            </p>
           </div>
 
           <!-- Contract addresses -->
