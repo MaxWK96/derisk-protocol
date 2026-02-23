@@ -780,19 +780,16 @@ function App() {
                 </section>
               </ScrollReveal>
 
-              {/* RISK EXPLAINABILITY + CONSUMER */}
+              {/* DETAIL ACCORDIONS — collapsed by default */}
               <ScrollReveal>
-                <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <RiskBreakdown tvlRisk={tvlScore} depegRisk={depegScore} contagionRisk={contagionScore} totalRisk={score} />
-                  <ConsumerStatus riskScore={score} circuitBreakerActive={circuitBreaker} />
-                </section>
-              </ScrollReveal>
-
-              {/* CONTAGION + DEPEG */}
-              <ScrollReveal>
-                <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div className="lg:col-span-2 bg-card border border-border rounded-lg p-6">
-                    <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest mb-4">Cross-Protocol Contagion</div>
+                <section className="bg-card border border-border rounded-lg px-6">
+                  <AccordionItem title="Risk Explainability" badge="TVL · Depeg · Contagion">
+                    <RiskBreakdown tvlRisk={tvlScore} depegRisk={depegScore} contagionRisk={contagionScore} totalRisk={score} />
+                  </AccordionItem>
+                  <AccordionItem title="Consumer Contract" badge="whenSafe() · circuit breaker">
+                    <ConsumerStatus riskScore={score} circuitBreakerActive={circuitBreaker} />
+                  </AccordionItem>
+                  <AccordionItem title="Cross-Protocol Contagion" badge={`cascade ${contagionScore}/100`}>
                     <div className="grid grid-cols-2 gap-3 mb-4">
                       <div className="bg-muted border border-border rounded p-4">
                         <div className="text-[9px] font-mono text-muted-foreground uppercase">Cascade Risk</div>
@@ -827,10 +824,8 @@ function App() {
                         </div>
                       ))}
                     </div>
-                  </div>
-
-                  <div className="bg-card border border-border rounded-lg p-6">
-                    <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest mb-4">Stablecoin Depeg Monitor</div>
+                  </AccordionItem>
+                  <AccordionItem title="Stablecoin Depeg Monitor" badge="USDT · USDC · DAI">
                     <div className="space-y-3">
                       {[
                         { symbol: 'USDT', type: 'Fiat-backed' },
@@ -860,7 +855,7 @@ function App() {
                       })}
                     </div>
                     <div className="text-[9px] font-mono text-derisk-text-dim mt-3">0.5% watch · 2% warning · 5% critical</div>
-                  </div>
+                  </AccordionItem>
                 </section>
               </ScrollReveal>
 

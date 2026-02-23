@@ -62,9 +62,9 @@ export function SystemHealth({ lastUpdateTimestamp, riskScore }: SystemHealthPro
       id: 'defi-llama',
       label: 'DeFi Llama API',
       detail: oracleNeverUpdated
-        ? 'No data yet — testnet mode'
+        ? 'Awaiting first fetch'
         : oracleStale
-          ? 'Data stale — expected on testnet'
+          ? 'Testnet demo — Sepolia feeds update on-demand'
           : `Last update ${relativeTime(secondsSinceUpdate)}`,
       status: oracleNeverUpdated ? 'testnet' : oracleStale ? 'testnet' : 'healthy',
     },
@@ -72,9 +72,9 @@ export function SystemHealth({ lastUpdateTimestamp, riskScore }: SystemHealthPro
       id: 'chainlink-feed',
       label: 'Chainlink Price Feed',
       detail: oracleNeverUpdated
-        ? 'Awaiting oracle data — testnet mode'
+        ? 'Awaiting first fetch'
         : oracleStale
-          ? `Feed age ${relativeTime(secondsSinceUpdate)} — normal on Sepolia`
+          ? 'Testnet demo — Sepolia feeds update on-demand'
           : `Updated ${relativeTime(secondsSinceUpdate)}`,
       status: oracleNeverUpdated ? 'testnet' : oracleStale ? 'testnet' : 'healthy',
     },
