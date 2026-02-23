@@ -43,3 +43,4 @@ max-workflow/*.wasm
 # Temp files
 **/tmp.js
 **/tmp.wasm
+.vercel

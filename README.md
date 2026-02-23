@@ -534,6 +534,46 @@ derisk-protocol/
 └── README.md
 ```
 
+## Chainlink Integration Files
+
+Every file in this repository that directly uses a Chainlink service:
+
+**Smart Contracts**
+- [contracts/DeRiskOracle.sol](https://github.com/MaxWK96/derisk-protocol/blob/main/contracts/DeRiskOracle.sol) — CRE `IReceiver` interface + Chainlink Automation (`checkUpkeep` / `performUpkeep`)
+- [contracts/SimpleLendingPool.sol](https://github.com/MaxWK96/derisk-protocol/blob/main/contracts/SimpleLendingPool.sol) — consumer contract reading `riskScore()` + `circuitBreakerActive()` from DeRiskOracle
+- [contracts/RiskAwareVault.sol](https://github.com/MaxWK96/derisk-protocol/blob/main/contracts/RiskAwareVault.sol) — consumer contract with dynamic LTV using live `riskScore()`
+- [contracts/script/DeployConsumer.s.sol](https://github.com/MaxWK96/derisk-protocol/blob/main/contracts/script/DeployConsumer.s.sol) — Foundry deploy script for SimpleLendingPool on Sepolia
+- [contracts/script/DeployRiskAwareVault.s.sol](https://github.com/MaxWK96/derisk-protocol/blob/main/contracts/script/DeployRiskAwareVault.s.sol) — Foundry deploy script for RiskAwareVault on Sepolia
+- [contracts/abi/ChainlinkPriceFeed.ts](https://github.com/MaxWK96/derisk-protocol/blob/main/contracts/abi/ChainlinkPriceFeed.ts) — Chainlink Price Feed ABI (`latestRoundData`) used by frontend
+- [contracts/abi/DeRiskOracle.ts](https://github.com/MaxWK96/derisk-protocol/blob/main/contracts/abi/DeRiskOracle.ts) — DeRiskOracle ABI consumed by CRE SDK and frontend
+
+**CRE Workflow**
+- [derisk-workflow/main.ts](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/main.ts) — CRE 5-step pipeline: `EVMClient` (Price Feeds), `ConfidentialHTTPClient` (Anthropic/TEE), `HTTPClient`, `writeReport()`
+- [derisk-workflow/workflow.yaml](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/workflow.yaml) — CRE workflow definition, triggers, and step configuration
+- [derisk-workflow/config.staging.json](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/config.staging.json) — Chainlink Price Feed address, oracle address, Automation schedule
+- [derisk-workflow/config.production.json](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/config.production.json) — production Price Feed and oracle configuration
+- [derisk-workflow/chainlink-functions-source.js](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/chainlink-functions-source.js) — Chainlink Functions DON fallback scoring source
+- [derisk-workflow/deploy-functions.ts](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/deploy-functions.ts) — Chainlink Functions toolkit deployment script
+- [derisk-workflow/lib/contagion-analyzer.ts](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/lib/contagion-analyzer.ts) — contagion cascade module (CRE pipeline step 3)
+- [derisk-workflow/lib/multi-ai-consensus.ts](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/lib/multi-ai-consensus.ts) — multi-AI weighted median consensus (CRE pipeline step 4)
+- [derisk-workflow/lib/depeg-monitor.ts](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/lib/depeg-monitor.ts) — stablecoin depeg monitoring module (CRE pipeline)
+- [derisk-workflow/lib/historical-backtester.ts](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/lib/historical-backtester.ts) — backtesting engine validated against historical Chainlink Price Feed data
+
+**Alternative CRE Workflow (Data Streams + Proof of Reserves)**
+- [max-workflow/main.ts](https://github.com/MaxWK96/derisk-protocol/blob/main/max-workflow/main.ts) — CRE workflow variant with Chainlink Data Streams and Proof of Reserves
+- [max-workflow/workflow.yaml](https://github.com/MaxWK96/derisk-protocol/blob/main/max-workflow/workflow.yaml) — CRE config for Data Streams / Proof of Reserves pipeline
+- [max-workflow/config.staging.json](https://github.com/MaxWK96/derisk-protocol/blob/main/max-workflow/config.staging.json) — Data Streams endpoint and Proof of Reserves proxy address
+
+**Frontend**
+- [frontend/src/App.tsx](https://github.com/MaxWK96/derisk-protocol/blob/main/frontend/src/App.tsx) — live dashboard reading all 5 Chainlink service outputs from DeRiskOracle
+- [frontend/src/components/ArchitectureDiagram.tsx](https://github.com/MaxWK96/derisk-protocol/blob/main/frontend/src/components/ArchitectureDiagram.tsx) — interactive Chainlink services architecture diagram (CRE, Price Feeds, Functions, Automation, Data Streams)
+- [frontend/src/components/CREWorkflowPanel.tsx](https://github.com/MaxWK96/derisk-protocol/blob/main/frontend/src/components/CREWorkflowPanel.tsx) — CRE 5-step pipeline visualization
+- [frontend/src/components/SystemHealth.tsx](https://github.com/MaxWK96/derisk-protocol/blob/main/frontend/src/components/SystemHealth.tsx) — Chainlink Price Feed staleness monitoring UI
+- [frontend/src/components/BacktestTimeline.tsx](https://github.com/MaxWK96/derisk-protocol/blob/main/frontend/src/components/BacktestTimeline.tsx) — historical backtesting chart using Chainlink Price Feed data
+- [frontend/src/components/RiskBreakdown.tsx](https://github.com/MaxWK96/derisk-protocol/blob/main/frontend/src/components/RiskBreakdown.tsx) — CRE consensus score display (per-model breakdown)
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
