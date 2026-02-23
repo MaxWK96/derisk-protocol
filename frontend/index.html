@@ -163,21 +163,27 @@
         margin-bottom: 10px;
       }
       .ss-claim-setup {
-        font-size: clamp(1rem, 2.5vw, 1.2rem);
-        font-weight: 600;
+        font: 400 13px/1 'Courier New', monospace;
         color: #8898aa;
-        line-height: 1.4;
-        margin: 0 0 4px;
+        margin: 0 0 12px;
       }
-      .ss-claim-setup-em { color: #e2e8f0; font-weight: 700; }
+      .ss-claim-setup-em { color: #e2e8f0; font-weight: 600; }
+      .ss-claim-num {
+        display: block;
+        font-size: clamp(3.5rem, 12vw, 5.5rem);
+        font-weight: 900;
+        line-height: 1;
+        color: #ef4444;
+        margin: 0 0 6px;
+        letter-spacing: -0.02em;
+      }
       .ss-claim-punchline {
-        font-size: clamp(1.75rem, 5vw, 2.5rem);
-        font-weight: 800;
-        line-height: 1.15;
+        font-size: clamp(1.25rem, 3.5vw, 1.75rem);
+        font-weight: 700;
+        line-height: 1.2;
         color: #e2e8f0;
         margin: 0 0 10px;
       }
-      .ss-claim-num { color: #ef4444; }
       .ss-claim-footnote {
         font: 400 10px/1 'Courier New', monospace;
         color: #475569;
@@ -254,11 +260,10 @@
               Would have flagged the collapse
               <strong class="ss-claim-setup-em">48 hours early.</strong>
             </p>
-            <p class="ss-claim-punchline">
-              <span class="ss-claim-num">$40B</span> in losses preventable.
-            </p>
+            <span class="ss-claim-num">$40B</span>
+            <p class="ss-claim-punchline">in losses preventable.</p>
             <p class="ss-claim-footnote">
-              Also: FTX Nov 2022 · USDC Depeg Mar 2023 · ~$21B combined DeFi exposure
+              Also: FTX Nov 2022 · USDC Depeg Mar 2023 · ~$21B combined
             </p>
           </div>
 

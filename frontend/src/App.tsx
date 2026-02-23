@@ -85,6 +85,7 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'dashboard' | 'debug'>('dashboard')
   const [simulatorPreset, setSimulatorPreset] = useState<SimulatorPreset>(null)
+  const [showFullAnalysis, setShowFullAnalysis] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
@@ -178,7 +179,7 @@ function App() {
 
         {/* HERO */}
         <motion.section
-          className="relative bg-card border border-border rounded-lg overflow-hidden mb-6"
+          className="relative bg-card border border-border rounded-lg overflow-hidden mb-12"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
@@ -247,16 +248,21 @@ function App() {
                 <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-3">
                   Backtested · Terra May 2022
                 </div>
-                <p className="text-lg sm:text-xl font-semibold text-derisk-text-secondary leading-snug mb-1">
+                <p className="text-sm font-mono text-derisk-text-secondary mb-3">
                   Would have flagged the collapse{' '}
-                  <span className="text-foreground">48 hours early.</span>
+                  <span className="text-foreground font-semibold">48 hours early.</span>
                 </p>
-                <p className="text-3xl sm:text-4xl font-bold leading-tight">
-                  <span style={{ color: 'hsl(0, 84%, 62%)' }}>$40B</span>
-                  <span className="text-foreground"> in losses preventable.</span>
+                <p
+                  className="text-6xl sm:text-7xl font-black leading-none tabular-nums mb-2"
+                  style={{ color: 'hsl(0, 84%, 62%)' }}
+                >
+                  $40B
                 </p>
-                <p className="text-[10px] font-mono text-muted-foreground mt-3">
-                  Also: FTX Nov 2022 · USDC Depeg Mar 2023 · ~$21B combined DeFi exposure
+                <p className="text-xl sm:text-2xl font-bold text-foreground leading-tight mb-3">
+                  in losses preventable.
+                </p>
+                <p className="text-[10px] font-mono text-muted-foreground">
+                  Also: FTX Nov 2022 · USDC Depeg Mar 2023 · ~$21B combined
                 </p>
               </motion.div>
             </motion.div>
@@ -347,11 +353,20 @@ function App() {
         </motion.section>
 
         {/* BEFORE / AFTER */}
-        <BeforeAfterStrip />
+        <div className="mb-12">
+          <BeforeAfterStrip />
+        </div>
+
+        {/* INTEGRATE IN 3 LINES — moved here: strongest "this is real" proof point */}
+        <ScrollReveal>
+          <div className="mb-12">
+            <IntegrateSection />
+          </div>
+        </ScrollReveal>
 
         {/* SCENARIO SIMULATOR */}
         <ScrollReveal>
-          <section id="simulator" className="mb-6">
+          <section id="simulator" className="mb-12">
             <div className="bg-card border border-border rounded-lg overflow-hidden">
               <div className="px-6 pt-6 pb-4 border-b border-border">
                 <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-1">Scenario Simulator</div>
@@ -427,7 +442,7 @@ function App() {
 
         {/* 5-STEP TIMELINE */}
         <ScrollReveal>
-          <section className="mb-6">
+          <section className="mb-12">
             <div className="bg-card border border-border rounded-lg p-6 lg:p-10">
               <div className="text-center mb-10">
                 <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-2">How It Works</div>
@@ -481,7 +496,7 @@ function App() {
 
         {/* CHAINLINK VERIFICATION STACK */}
         <ScrollReveal>
-          <section className="mb-6">
+          <section className="mb-12">
             <div className="rounded-lg border border-border overflow-hidden relative"
               style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(168,85,247,0.05), rgba(16,185,129,0.04))' }}>
               <div className="absolute inset-0 grid-overlay pointer-events-none opacity-30" />
@@ -526,10 +541,41 @@ function App() {
           </section>
         </ScrollReveal>
 
-        {/* INTEGRATE IN 3 LINES */}
-        <ScrollReveal>
-          <IntegrateSection />
-        </ScrollReveal>
+        {/* VIEW FULL ANALYSIS TOGGLE */}
+        <div className="flex flex-col items-center gap-3 py-10 border-t border-border">
+          <motion.button
+            onClick={() => setShowFullAnalysis((v) => !v)}
+            className="group flex items-center gap-3 px-6 py-3 rounded-lg border border-border bg-card hover:border-primary text-sm font-mono text-muted-foreground hover:text-primary transition-all cursor-pointer"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <span>
+              {showFullAnalysis
+                ? 'Collapse Full Analysis'
+                : 'View Full Analysis — Live Dashboard · CRE Workflow · Architecture'}
+            </span>
+            <motion.span
+              className="text-xs"
+              animate={{ rotate: showFullAnalysis ? 180 : 0 }}
+              transition={{ duration: 0.25 }}
+            >▾</motion.span>
+          </motion.button>
+          {!showFullAnalysis && (
+            <p className="text-[10px] font-mono text-muted-foreground">
+              Live risk score · Contagion matrix · Protocol breakdown · Technical deep dive
+            </p>
+          )}
+        </div>
+
+        <AnimatePresence>
+          {showFullAnalysis && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.4, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
 
         {/* CRE WORKFLOW */}
         <ScrollReveal>
@@ -929,45 +975,50 @@ function App() {
               </ScrollReveal>
             </div>
 
-            {/* FOOTER */}
-            <footer className="py-10 border-t border-border">
-              <div className="text-center mb-6">
-                <div className="text-lg font-bold text-foreground mb-1">DERISK PROTOCOL</div>
-                <div className="text-xs text-muted-foreground">AI-Powered DeFi Risk Oracle · Chainlink Convergence Hackathon 2026</div>
-              </div>
-              <div className="flex flex-wrap justify-center gap-2 mb-6">
-                {[
-                  { label: 'Chainlink CRE', color: 'hsl(217, 91%, 60%)' },
-                  { label: 'Multi-AI Consensus', color: 'hsl(271, 91%, 65%)' },
-                  { label: 'Confidential HTTP + TEE', color: 'hsl(160, 84%, 39%)' },
-                  { label: 'Circuit Breaker', color: 'hsl(0, 84%, 60%)' },
-                  { label: 'On-Chain Proofs', color: 'hsl(38, 92%, 50%)' },
-                ].map((badge) => (
-                  <span key={badge.label} className="text-[9px] font-mono px-2.5 py-1 rounded-full"
-                    style={{ color: badge.color, backgroundColor: `${badge.color}12`, border: `1px solid ${badge.color}25` }}>
-                    {badge.label}
-                  </span>
-                ))}
-              </div>
-              <div className="flex flex-wrap justify-center gap-4 mb-6">
-                {[
-                  { label: '📄 GitHub', href: 'https://github.com/MaxWK96/derisk-protocol' },
-                  { label: '🔍 Etherscan', href: `https://sepolia.etherscan.io/address/${DERISK_ORACLE_ADDRESS}` },
-                  { label: '🎥 Demo Video', href: '#' },
-                  { label: '📋 Submission', href: 'https://airtable.com/appgJctAaKPFkMKrW/pagPPG1kBRC0C54w6/form' },
-                ].map((link) => (
-                  <a key={link.label} href={link.href} target="_blank" rel="noopener noreferrer"
-                    className="px-4 py-2 rounded border border-border bg-muted hover:border-primary text-xs font-mono text-derisk-text-secondary hover:text-primary transition-all hover:shadow-[0_0_12px_hsl(164,100%,36%,0.12)]">
-                    {link.label}
-                  </a>
-                ))}
-              </div>
-              <div className="text-center text-[10px] font-mono text-derisk-text-dim">
-                Built with ❤️ for the Chainlink ecosystem · Sepolia Testnet · {new Date().getFullYear()}
-              </div>
-            </footer>
           </div>
         )}
+
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* FOOTER — always visible */}
+        <footer className="py-10 mt-4 border-t border-border">
+          <div className="text-center mb-6">
+            <div className="text-lg font-bold text-foreground mb-1">DERISK PROTOCOL</div>
+            <div className="text-xs text-muted-foreground">AI-Powered DeFi Risk Oracle · Chainlink Convergence Hackathon 2026</div>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2 mb-6">
+            {[
+              { label: 'Chainlink CRE', color: 'hsl(217, 91%, 60%)' },
+              { label: 'Multi-AI Consensus', color: 'hsl(271, 91%, 65%)' },
+              { label: 'Confidential HTTP + TEE', color: 'hsl(160, 84%, 39%)' },
+              { label: 'Circuit Breaker', color: 'hsl(0, 84%, 60%)' },
+              { label: 'On-Chain Proofs', color: 'hsl(38, 92%, 50%)' },
+            ].map((badge) => (
+              <span key={badge.label} className="text-[9px] font-mono px-2.5 py-1 rounded-full"
+                style={{ color: badge.color, backgroundColor: `${badge.color}12`, border: `1px solid ${badge.color}25` }}>
+                {badge.label}
+              </span>
+            ))}
+          </div>
+          <div className="flex flex-wrap justify-center gap-4 mb-6">
+            {[
+              { label: '📄 GitHub', href: 'https://github.com/MaxWK96/derisk-protocol' },
+              { label: '🔍 Etherscan', href: `https://sepolia.etherscan.io/address/${DERISK_ORACLE_ADDRESS}` },
+              { label: '🎥 Demo Video', href: '#' },
+              { label: '📋 Submission', href: 'https://airtable.com/appgJctAaKPFkMKrW/pagPPG1kBRC0C54w6/form' },
+            ].map((link) => (
+              <a key={link.label} href={link.href} target="_blank" rel="noopener noreferrer"
+                className="px-4 py-2 rounded border border-border bg-muted hover:border-primary text-xs font-mono text-derisk-text-secondary hover:text-primary transition-all hover:shadow-[0_0_12px_hsl(164,100%,36%,0.12)]">
+                {link.label}
+              </a>
+            ))}
+          </div>
+          <div className="text-center text-[10px] font-mono text-derisk-text-dim">
+            Built with ❤️ for the Chainlink ecosystem · Sepolia Testnet · {new Date().getFullYear()}
+          </div>
+        </footer>
       </main>
     </div>
   )

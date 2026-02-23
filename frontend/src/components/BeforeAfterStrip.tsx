@@ -24,7 +24,7 @@ const GREEN = 'hsl(160, 84%, 39%)'
 
 export function BeforeAfterStrip() {
   return (
-    <div className="bg-card border border-border rounded-lg overflow-hidden mb-6">
+    <div className="bg-card border border-border rounded-lg overflow-hidden">
       {/* Column headers */}
       <div className="grid border-b border-border" style={{ gridTemplateColumns: '1fr 36px 1fr' }}>
         <div
