@@ -1,0 +1,10 @@
+{
+  "name": "derisk-protocol",
+  "version": "1.0.0",
+  "description": "AI-Powered DeFi Risk Oracle - Chainlink Convergence Hackathon 2026",
+  "scripts": {
+    "cre:simulate": "C:\\Users\\macki\\Downloads\\cre_windows_amd64\\cre_v1.2.0.exe workflow simulate ./derisk-workflow --non-interactive --trigger-index 0 -T staging-settings",
+    "cre:simulate:ai": "C:\\Users\\macki\\Downloads\\cre_windows_amd64\\cre_v1.2.0.exe workflow simulate ./derisk-workflow --non-interactive --trigger-index 0 -T local-settings",
+    "cre:broadcast": "C:\\Users\\macki\\Downloads\\cre_windows_amd64\\cre_v1.2.0.exe workflow simulate ./derisk-workflow --non-interactive --trigger-index 0 -T staging-settings --broadcast"
+  }
+}

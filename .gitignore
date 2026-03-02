@@ -12,6 +12,8 @@ cache/
 .env
 .env.*
 secrets.yaml
+**/secrets.json
+**/config.local.json
 *.local
 
 # Foundry

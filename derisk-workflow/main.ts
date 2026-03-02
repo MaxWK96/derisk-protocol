@@ -31,7 +31,7 @@ import { type Address, decodeFunctionResult, encodeFunctionData, zeroAddress } f
 import { z } from 'zod'
 import { ChainlinkPriceFeed, DeRiskOracle } from '../contracts/abi'
 import { analyzeContagion, formatContagionForAI, type ProtocolMetrics, type ContagionAnalysis } from './lib/contagion-analyzer'
-import { analyzeDepegRisk, formatDepegForAI, type DepegAnalysis } from './lib/depeg-monitor'
+import { fetchRawStablecoinPrices, analyzeDepegRisk, formatDepegForAI, type StablecoinPricesRaw, type DepegAnalysis } from './lib/depeg-monitor'
 import { computeConsensus, computeRuleBasedScore, computeContagionAdjustedScore, formatConsensusForLog, type AIModelScore, type ConsensusResult } from './lib/multi-ai-consensus'
 
 // ============================================================================
@@ -40,7 +40,7 @@ import { computeConsensus, computeRuleBasedScore, computeContagionAdjustedScore,
 
 const configSchema = z.object({
 	schedule: z.string(),
-	anthropicApiKey: z.string(),
+	anthropicApiKey: z.string().optional().default(''),
 	defiLlamaUrl: z.string(),
 	evms: z.array(
 		z.object({
@@ -159,7 +159,7 @@ const readEthPrice = (runtime: Runtime<Config>): bigint => {
 const fetchAIRiskScore = (
 	sendRequester: HTTPSendRequester,
 	params: {
-		config: Config
+		anthropicApiKey: string
 		aaveTvl: number
 		compoundTvl: number
 		makerTvl: number
@@ -169,7 +169,7 @@ const fetchAIRiskScore = (
 		depegData: string
 	},
 ): RiskResult => {
-	const { config, aaveTvl, compoundTvl, makerTvl, totalTvl, ethPrice, contagionData, depegData } = params
+	const { anthropicApiKey, aaveTvl, compoundTvl, makerTvl, totalTvl, ethPrice, contagionData, depegData } = params
 
 	const prompt = `You are a DeFi risk analysis AI for the DeRisk Protocol oracle. Analyze these multi-protocol metrics and return an aggregate risk score.
 
@@ -210,19 +210,16 @@ Respond with ONLY valid JSON, no markdown, no explanation:
 		messages: [{ role: 'user', content: prompt }],
 	})
 
-	// CRE HTTP body must be base64-encoded (protobuf bytes field)
-	const bodyBase64 = Buffer.from(requestBody).toString('base64')
-
 	const response = sendRequester
 		.sendRequest({
 			method: 'POST',
 			url: 'https://api.anthropic.com/v1/messages',
 			headers: {
 				'Content-Type': 'application/json',
-				'x-api-key': config.anthropicApiKey,
+				'x-api-key': anthropicApiKey,
 				'anthropic-version': '2023-06-01',
 			},
-			body: bodyBase64,
+			body: Buffer.from(requestBody).toString('base64'),
 		})
 		.result()
 
@@ -460,16 +457,28 @@ const assessRisk = (runtime: Runtime<Config>): string => {
 		runtime.log(`  Blast Radius (${protocol}): $${(loss / 1e9).toFixed(2)}B`)
 	}
 
-	// ---- Step 3b: Stablecoin Depeg Early Warning ----
+	// ---- Step 3b: Stablecoin Depeg Early Warning (live CoinGecko prices) ----
 	runtime.log('')
-	runtime.log('  Running stablecoin depeg analysis...')
+	runtime.log('  Fetching live stablecoin prices from CoinGecko...')
 
-	const depegAnalysis = analyzeDepegRisk(
-		ethPriceUSD,
-		metrics.aaveTvl,
-		metrics.compoundTvl,
-		metrics.makerTvl,
-	)
+	const stablecoinPrices = httpClient
+		.sendRequest(
+			runtime,
+			fetchRawStablecoinPrices,
+			ConsensusAggregationByFields<StablecoinPricesRaw>({
+				usdtPrice: median,
+				usdcPrice: median,
+				daiPrice: median,
+			}),
+		)()
+		.result()
+
+	runtime.log(`  USDT: $${stablecoinPrices.usdtPrice.toFixed(4)}`)
+	runtime.log(`  USDC: $${stablecoinPrices.usdcPrice.toFixed(4)}`)
+	runtime.log(`  DAI:  $${stablecoinPrices.daiPrice.toFixed(4)}`)
+
+	runtime.log('  Running stablecoin depeg analysis...')
+	const depegAnalysis = analyzeDepegRisk(stablecoinPrices)
 	const depegPromptData = formatDepegForAI(depegAnalysis)
 
 	runtime.log(`  Depeg Risk Score:  ${depegAnalysis.depegRiskScore}/100`)
@@ -487,7 +496,21 @@ const assessRisk = (runtime: Runtime<Config>): string => {
 	// ---- Step 4: AI Risk Analysis (enriched with contagion + depeg data) ----
 	runtime.log('')
 	runtime.log('[4/5] Running AI risk analysis via Anthropic Claude...')
-	runtime.log('  (Prompt enriched with contagion analysis)')
+
+	// Fetch Anthropic API key.
+	// Priority: 1) CRE secrets (VaultDON in production / secrets.json in sim)
+	//           2) config.anthropicApiKey (config.local.json, gitignored, for local dev)
+	//           3) empty → fallback rule-based scorer
+	let anthropicApiKey = ''
+	try {
+		anthropicApiKey = runtime.getSecret({ id: 'anthropic_api_key' }).result().value
+		runtime.log('  Key source: CRE secrets (anthropic_api_key)')
+	} catch (_) {
+		// Secrets not available in this simulation — use config value
+		anthropicApiKey = runtime.config.anthropicApiKey ?? ''
+		const source = anthropicApiKey ? 'config.local.json' : 'none (will use fallback)'
+		runtime.log(`  Key source: ${source}`)
+	}
 
 	const riskResult = httpClient
 		.sendRequest(
@@ -498,7 +521,7 @@ const assessRisk = (runtime: Runtime<Config>): string => {
 				source: median,
 			}),
 		)({
-			config: runtime.config,
+			anthropicApiKey,
 			aaveTvl: metrics.aaveTvl,
 			compoundTvl: metrics.compoundTvl,
 			makerTvl: metrics.makerTvl,
@@ -509,7 +532,7 @@ const assessRisk = (runtime: Runtime<Config>): string => {
 		})
 		.result()
 
-	const scoringMethod = riskResult.source === 1 ? 'Anthropic Claude AI' : 'Chainlink Functions (fallback)'
+	const scoringMethod = riskResult.source === 1 ? 'Anthropic Claude AI (Confidential)' : 'Chainlink Functions (fallback)'
 	runtime.log(`  Claude Score: ${riskResult.riskScore}/100`)
 	runtime.log(`  Scored By:    ${scoringMethod}`)
 

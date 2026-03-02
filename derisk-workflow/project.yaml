@@ -1,0 +1,22 @@
+# ==========================================================================
+# DeRisk Protocol — CRE Project Settings
+# ==========================================================================
+# Chainlink Convergence Hackathon 2026
+#
+# Simulate (from project root):
+#   cre workflow simulate ./derisk-workflow --non-interactive --trigger-index 0 -T staging-settings
+
+local-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com
+
+staging-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com
+
+production-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com

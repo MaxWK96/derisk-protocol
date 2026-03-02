@@ -2,13 +2,15 @@
  * DeRisk Protocol - Stablecoin Depeg Early Warning System
  *
  * Monitors major stablecoins for deviation from their $1.00 peg.
- * Uses DeFi Llama stablecoin data to detect early depeg signals.
+ * Fetches live prices from CoinGecko API via CRE HTTPClient.
  *
  * Historical depeg events modeled:
  * - UST collapse (May 2022): gradual then catastrophic depeg
  * - USDC depeg (Mar 2023): dropped to $0.87 during SVB crisis
  * - DAI instability: tracks MakerDAO collateral health
  */
+
+import type { HTTPSendRequester } from '@chainlink/cre-sdk'
 
 // ============================================================================
 // Types
@@ -18,6 +20,13 @@ export interface StablecoinPrice {
 	symbol: string
 	price: number // Current price (should be ~1.00)
 	mechanism: string // 'algorithmic' | 'fiat-backed' | 'crypto-backed'
+}
+
+// Raw prices fetched from CoinGecko — used with ConsensusAggregationByFields
+export interface StablecoinPricesRaw {
+	usdtPrice: number
+	usdcPrice: number
+	daiPrice: number
 }
 
 export interface DepegAlert {
@@ -71,25 +80,59 @@ const STABLECOIN_CONFIG: Record<string, { mechanism: string; riskFactor: string 
 }
 
 // ============================================================================
+// CoinGecko Fetch — used as HTTPClient.sendRequest handler
+// ============================================================================
+
+// CoinGecko free API — no key required
+// Returns: {"tether":{"usd":1.001},"usd-coin":{"usd":0.9999},"dai":{"usd":0.9998}}
+const COINGECKO_URL =
+	'https://api.coingecko.com/api/v3/simple/price?ids=tether,usd-coin,dai&vs_currencies=usd'
+
+/**
+ * Fetch live stablecoin prices from CoinGecko.
+ *
+ * Designed to run as a CRE HTTPClient.sendRequest handler so that
+ * prices are fetched across all CRE nodes and aggregated via median.
+ *
+ * Falls back to 1.0 for any price that fails to parse, so the
+ * pipeline never hard-crashes on a CoinGecko outage.
+ */
+export const fetchRawStablecoinPrices = (
+	sendRequester: HTTPSendRequester,
+): StablecoinPricesRaw => {
+	const response = sendRequester
+		.sendRequest({ method: 'GET', url: COINGECKO_URL })
+		.result()
+
+	if (response.statusCode !== 200) {
+		return { usdtPrice: 1.0, usdcPrice: 1.0, daiPrice: 1.0 }
+	}
+
+	const body = JSON.parse(Buffer.from(response.body).toString('utf-8'))
+
+	return {
+		usdtPrice: body['tether']?.['usd'] ?? 1.0,
+		usdcPrice: body['usd-coin']?.['usd'] ?? 1.0,
+		daiPrice: body['dai']?.['usd'] ?? 1.0,
+	}
+}
+
+// ============================================================================
 // Analysis Engine
 // ============================================================================
 
 /**
- * Analyze stablecoin prices for depeg risk.
- * In CRE we can't fetch real stablecoin prices directly (HTTP buffer limit),
- * so we derive risk from the protocol TVL changes and ETH price.
+ * Analyze stablecoin depeg risk from live CoinGecko prices.
  *
- * For hackathon demo: use simulated prices based on market conditions.
+ * @param prices - Raw prices fetched via fetchRawStablecoinPrices and
+ *                 aggregated by ConsensusAggregationByFields in main.ts
  */
-export function analyzeDepegRisk(
-	ethPrice: number,
-	aaveTvl: number,
-	compoundTvl: number,
-	makerTvl: number,
-): DepegAnalysis {
-	// Derive stablecoin stress from market conditions
-	// In a real system, we'd fetch from CoinGecko or DeFi Llama stablecoin API
-	const stablecoins = estimateStablecoinPrices(ethPrice, aaveTvl, compoundTvl, makerTvl)
+export function analyzeDepegRisk(prices: StablecoinPricesRaw): DepegAnalysis {
+	const stablecoins: StablecoinPrice[] = [
+		{ symbol: 'USDT', price: prices.usdtPrice, mechanism: 'fiat-backed' },
+		{ symbol: 'USDC', price: prices.usdcPrice, mechanism: 'fiat-backed' },
+		{ symbol: 'DAI',  price: prices.daiPrice,  mechanism: 'crypto-backed' },
+	]
 
 	const alerts: DepegAlert[] = []
 
@@ -123,8 +166,7 @@ export function analyzeDepegRisk(
 	for (const coin of stablecoins) {
 		const deviation = Math.abs(coin.price - 1.0)
 		const mechanismMultiplier = MECHANISM_RISK[coin.mechanism] || 1.0
-		// Each stablecoin contributes proportionally to its deviation and risk type
-		depegRiskScore += deviation * 100 * mechanismMultiplier * 10 // Scale to 0-100 range
+		depegRiskScore += deviation * 100 * mechanismMultiplier * 10
 	}
 	depegRiskScore = Math.min(100, Math.round(depegRiskScore))
 
@@ -134,8 +176,9 @@ export function analyzeDepegRisk(
 		stablecoins[0],
 	)
 
-	const avgDeviation = stablecoins.reduce((sum, coin) =>
-		sum + Math.abs(coin.price - 1.0), 0) / stablecoins.length
+	const avgDeviation =
+		stablecoins.reduce((sum, coin) => sum + Math.abs(coin.price - 1.0), 0) /
+		stablecoins.length
 
 	return {
 		stablecoins,
@@ -144,68 +187,6 @@ export function analyzeDepegRisk(
 		worstDepeg: worstCoin.symbol,
 		avgDeviation: Math.round(avgDeviation * 10000) / 10000,
 	}
-}
-
-/**
- * Estimate stablecoin prices from market conditions.
- *
- * Logic based on historical correlations:
- * - When ETH drops sharply (< $1500): DAI tends to lose peg slightly due to
- *   liquidation cascades in MakerDAO CDPs
- * - When lending TVL drops significantly: USDC/USDT face redemption pressure
- * - Under normal conditions: all stablecoins maintain tight peg
- */
-function estimateStablecoinPrices(
-	ethPrice: number,
-	aaveTvl: number,
-	compoundTvl: number,
-	makerTvl: number,
-): StablecoinPrice[] {
-	// Base prices (normal market conditions)
-	let usdtPrice = 1.0
-	let usdcPrice = 1.0
-	let daiPrice = 1.0
-
-	// ETH crash stress on DAI (MakerDAO collateral)
-	if (ethPrice < 1000) {
-		daiPrice -= 0.03 // 3% depeg during severe ETH crash
-		usdcPrice -= 0.005 // 0.5% sympathy depeg
-	} else if (ethPrice < 1500) {
-		daiPrice -= 0.01 // 1% depeg during moderate ETH stress
-		usdcPrice -= 0.002
-	} else if (ethPrice < 2000) {
-		daiPrice -= 0.003 // 0.3% slight deviation
-	}
-
-	// TVL stress on USDC (primary DeFi collateral)
-	const totalTvl = aaveTvl + compoundTvl + makerTvl
-	if (totalTvl < 10e9) {
-		usdcPrice -= 0.02 // 2% depeg if TVL drops below $10B (panic)
-		usdtPrice -= 0.01
-	} else if (totalTvl < 20e9) {
-		usdcPrice -= 0.005
-		usdtPrice -= 0.002
-	}
-
-	// MakerDAO-specific stress on DAI
-	if (makerTvl < 2e9) {
-		daiPrice -= 0.02 // Additional DAI stress if Maker TVL critically low
-	} else if (makerTvl < 4e9) {
-		daiPrice -= 0.005
-	}
-
-	// Add small random-like variation based on ETH price decimals
-	// (makes demo feel more realistic with slight deviations)
-	const microVar = (ethPrice % 10) / 10000 // 0.0000 to 0.0009
-	usdtPrice += microVar - 0.0004
-	usdcPrice -= microVar * 0.5
-	daiPrice += (microVar - 0.0005) * 2
-
-	return [
-		{ symbol: 'USDT', price: Math.round(usdtPrice * 10000) / 10000, mechanism: 'fiat-backed' },
-		{ symbol: 'USDC', price: Math.round(usdcPrice * 10000) / 10000, mechanism: 'fiat-backed' },
-		{ symbol: 'DAI', price: Math.round(daiPrice * 10000) / 10000, mechanism: 'crypto-backed' },
-	]
 }
 
 /**

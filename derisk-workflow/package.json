@@ -3,6 +3,9 @@
 	"version": "1.0.0",
 	"description": "AI-Powered DeFi Risk Oracle - Chainlink Convergence Hackathon 2026",
 	"main": "dist/main.js",
+	"scripts": {
+		"postinstall": "node -e \"require('fs').copyFileSync('wasm/javy-chainlink-sdk.plugin.wasm','node_modules/@chainlink/cre-sdk-javy-plugin/dist/javy-chainlink-sdk.plugin.wasm')\""
+	},
 	"dependencies": {
 		"@chainlink/cre-sdk": "^1.0.7",
 		"@chainlink/functions-toolkit": "^0.3.2",
