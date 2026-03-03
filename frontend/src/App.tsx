@@ -81,11 +81,19 @@ function App() {
   const [contagionData, setContagionData] = useState<ContagionData | null>(null)
   const [, setBacktestProofs] = useState<BacktestProof[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'dashboard' | 'debug'>('dashboard')
   const [simulatorPreset, setSimulatorPreset] = useState<SimulatorPreset>(null)
   const [showFullAnalysis, setShowFullAnalysis] = useState(false)
+
+  const handleOpenDashboard = useCallback(() => {
+    setShowFullAnalysis(true)
+    setTimeout(() => {
+      document.getElementById('live-dashboard')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 420)
+  }, [])
 
   const loadData = useCallback(async () => {
     try {
@@ -109,6 +117,12 @@ function App() {
       setLoading(false)
     }
   }, [])
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await loadData()
+    setRefreshing(false)
+  }, [loadData])
 
   useEffect(() => {
     loadData()
@@ -166,10 +180,11 @@ function App() {
               <span className="text-[10px] font-mono text-derisk-text-secondary">LIVE</span>
             </div>
             <button
-              onClick={loadData}
-              className="px-3 py-1.5 rounded border border-border bg-card hover:border-primary text-[10px] font-mono text-derisk-text-secondary hover:text-primary transition-all hover:shadow-[0_0_12px_hsl(164,100%,36%,0.15)] cursor-pointer"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="px-3 py-1.5 rounded border border-border bg-card hover:border-primary text-[10px] font-mono text-derisk-text-secondary hover:text-primary transition-all hover:shadow-[0_0_12px_hsl(164,100%,36%,0.15)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              REFRESH
+              {refreshing ? '...' : 'REFRESH'}
             </button>
           </div>
         </div>
@@ -223,12 +238,12 @@ function App() {
                   ⚡ Launch Simulator
                   <span className="group-hover:translate-x-0.5 inline-block transition-transform">→</span>
                 </a>
-                <a
-                  href="#live-dashboard"
-                  className="px-5 sm:px-6 py-3 rounded font-semibold text-sm border border-border hover:border-primary text-foreground hover:text-primary transition-all hover:shadow-[0_0_15px_hsl(164,100%,36%,0.1)]"
+                <button
+                  onClick={handleOpenDashboard}
+                  className="px-5 sm:px-6 py-3 rounded font-semibold text-sm border border-border hover:border-primary text-foreground hover:text-primary transition-all hover:shadow-[0_0_15px_hsl(164,100%,36%,0.1)] cursor-pointer"
                 >
                   📊 Live Dashboard
-                </a>
+                </button>
                 <a
                   href={`https://sepolia.etherscan.io/address/${DERISK_ORACLE_ADDRESS}`}
                   target="_blank" rel="noopener noreferrer"
