@@ -9,6 +9,36 @@
 
 ---
 
+## The problem your project addresses
+
+DeFi protocols managing tens of billions in TVL have no on-chain early warning system for systemic risk. When cascading liquidations hit — as in the Terra/Luna collapse (May 2022), FTX contagion (Nov 2022), and Euler hack (Mar 2023) — individual protocols have minutes to react, not days. There is no primitive that monitors cross-protocol contagion, stablecoin depeg risk, and AI-scored threat level simultaneously and exposes the result on-chain so any smart contract can read it.
+
+## How you've addressed the problem
+
+DeRisk Protocol is an on-chain risk oracle that runs a 5-step assessment pipeline every 5 minutes via Chainlink CRE:
+
+1. Fetches live TVL across Aave V3, Compound V3, and MakerDAO from DeFi Llama
+2. Reads the live ETH/USD price from a Chainlink Price Feed on Sepolia
+3. Runs a cross-protocol contagion cascade simulation (empirical correlation matrix: Aave↔Compound 0.87)
+4. Scores aggregate risk via multi-AI consensus: Claude AI (50%), rule-based (30%), contagion-adjusted (20%)
+5. Writes the final risk score, TVL snapshot, and circuit breaker state to `DeRiskOracle.sol` on Sepolia
+
+Any DeFi protocol integrates in 5 lines of Solidity. `SimpleLendingPool` demonstrates auto-pause when risk ≥ 70/100; `RiskAwareVault` demonstrates dynamic LTV that scales continuously with risk. Historical backtesting against 4 real events shows an average 2.3-day advance warning.
+
+## How you've used CRE
+
+CRE is the only component that makes this oracle possible. Every step runs inside the Chainlink Runtime Environment:
+
+- **`HTTPClient` + `ConsensusAggregationByFields`** — fetches TVL from DeFi Llama across all DON nodes and takes the median, preventing any single node from manipulating inputs
+- **`EVMClient`** — reads the Chainlink Price Feed (`latestRoundData`) directly from Sepolia at a finalized block, so the price is tamper-proof
+- **`HTTPClient`** (AI call) — sends the enriched prompt to Anthropic Claude API; in production this becomes `ConfidentialHTTPClient` so the API key and raw AI response never leave the TEE enclave
+- **`writeReport()`** — generates a cryptographically signed consensus report and writes it to `DeRiskOracle.sol` via `IReceiver.onReport()`; no trusted intermediary required
+- **`runtime.getSecret()`** — loads the Anthropic API key from CRE secrets (VaultDON in production), keeping it out of all committed config files
+
+The CRE cron trigger fires every 5 minutes. Without CRE, achieving DON-level consensus on multi-source off-chain data and writing it on-chain with cryptographic attestation would require building a custom oracle network from scratch.
+
+---
+
 ## What It Does
 
 DeRisk Protocol monitors systemic risk across major DeFi protocols in real-time:
@@ -181,24 +211,28 @@ DeRisk uses Chainlink Runtime Environment to orchestrate a 5-step risk assessmen
 | 1 | Fetch multi-protocol TVL | HTTPClient | DeFi Llama API (Aave, Compound, Maker) |
 | 2 | Read ETH/USD price | EVMClient | Chainlink Price Feed (Sepolia) |
 | 3 | Contagion cascade simulation | Internal | Correlation matrix (0.87 Aave↔Compound) |
-| 4 | Multi-AI consensus scoring | ConfidentialHTTPClient | Anthropic Claude API (protected via TEE) |
+| 4 | Multi-AI consensus scoring | HTTPClient (ConfidentialHTTPClient in production) | Anthropic Claude API |
 | 5 | Write risk data on-chain | writeReport() | DeRiskOracle.sol |
 
 ### Reproduce Locally
 ```bash
-cd derisk-workflow
-cre workflow simulate . --trigger-index 0
+# From project root — install workflow dependencies first
+cd derisk-workflow && bun install && cd ..
+
+# Run simulation (uses live Chainlink Price Feed + DeFi Llama)
+cre workflow simulate ./derisk-workflow --non-interactive --trigger-index 0 -T staging-settings
 ```
 
-**Evidence:** [View simulation log](docs/cre-workflow-log.txt)
+**Evidence:** [View simulation output](docs/cre-simulation-output.txt)
 
 ### Key CRE Features Used
 
-- **HTTPClient** — Public data from DeFi Llama
-- **ConfidentialHTTPClient** — Protected AI API calls in TEE
+- **HTTPClient** — Public data from DeFi Llama + AI scoring (simulation)
+- **ConfidentialHTTPClient** — AI calls in production, executed inside TEE enclave via VaultDON
 - **EVMClient** — Read Chainlink Price Feeds
 - **writeReport()** — On-chain risk score updates
 - **ConsensusAggregation** — Multi-model weighted median
+- **runtime.getSecret()** — Anthropic API key from CRE secrets, never in committed config
 
 ---
 
@@ -304,12 +338,12 @@ This hybrid model is standard for oracle networks: external data → consensus �
 ### 🔒 Privacy & Compliance
 
 **How DeRisk Fits:**
-- **Confidential HTTP:** All Anthropic API calls use ConfidentialHTTPClient + TEE
-- **Protected Secrets:** API keys stored in VaultDON, never exposed to DON nodes
-- **Private Prompts:** Risk model prompts executed in Trusted Execution Environment
-- **Institutional Use Case:** Enables regulated entities (RWA issuers, centralized venues) to monitor DeFi exposure without revealing positions
+- **Confidential HTTP (production):** In production, Anthropic API calls use `ConfidentialHTTPClient` + TEE enclave via VaultDON; in simulation, `HTTPClient` is used with the key loaded from `runtime.getSecret()`
+- **Protected Secrets:** API keys stored in VaultDON (`secrets.json` + `workflow.yaml secrets-path`), never committed to git and never exposed to DON nodes
+- **Private Prompts:** In production, risk model prompts execute inside a Trusted Execution Environment — raw AI responses never leave the enclave
+- **Institutional Use Case:** Enables regulated entities (RWA issuers, centralized venues) to monitor DeFi exposure without revealing positions or proprietary risk models
 
-**Why This Matters:** Traditional HTTP exposes proprietary risk models. Confidential HTTP isolates sensitive data in a TEE enclave.
+**Why This Matters:** Traditional HTTP exposes API keys and AI responses to all DON nodes. The VaultDON + ConfidentialHTTP architecture isolates this in a TEE enclave for production deployments.
 
 ---
 
@@ -338,8 +372,8 @@ cd ../frontend && npm install
 ### Run CRE Simulation
 
 ```bash
-cd derisk-workflow
-cre workflow simulate . --non-interactive --trigger-index 0
+cd derisk-workflow && bun install && cd ..
+cre workflow simulate ./derisk-workflow --non-interactive --trigger-index 0 -T staging-settings
 ```
 
 ### Launch Dashboard
@@ -364,15 +398,16 @@ cd frontend && npm run dev
 
 **Step 2: Trigger CRE Workflow**
 ```bash
-cd derisk-workflow
-cre workflow simulate . --trigger-index 0
+cd derisk-workflow && bun install && cd ..
+cre workflow simulate ./derisk-workflow --non-interactive --trigger-index 0 -T staging-settings
 
-# Expected output:
-# [Step 1/5] Fetching TVL... Aave: $10.9B, Comp: $2.7B, Maker: $6.5B
-# [Step 2/5] Reading ETH/USD... $2,818.47
-# [Step 3/5] Contagion analysis... Score: 28
-# [Step 4/5] AI consensus... Claude: 32, Rule: 22, Contagion: 26 → 28
-# [Step 5/5] Writing to DeRiskOracle... TX confirmed
+# Real output (see docs/cre-simulation-output.txt):
+# [1/5] Aave V3: $26.73B, Compound V3: $1.30B, MakerDAO: $5.71B
+# [2/5] ETH/USD: $2039.90 (live Chainlink Price Feed)
+# [3/5] Contagion Risk: 83/100, Worst-Case Loss: $14.66B
+# [3b]  USDT: $1.0000 (STABLE), USDC: $1.0000 (STABLE), DAI: $0.9999 (STABLE)
+# [4/5] Claude Score: 68/100, Scored By: Anthropic Claude AI
+# [5/5] On-chain write successful. TxHash: 0x000...000 (sim mode)
 ```
 
 **Step 3: Verify On-Chain**
@@ -400,7 +435,7 @@ cast call 0xbC75cCB19bc37a87bB0500c016bD13E50c591f09 \
 **Live Evidence:**
 - Risk update events: [View on Etherscan](https://sepolia.etherscan.io/address/0xbC75cCB19bc37a87bB0500c016bD13E50c591f09#events)
 - Consumer contract state: [Read SimpleLendingPool](https://sepolia.etherscan.io/address/0x942a20CF83626dA1aAb50f1354318eE04dF292c0#readContract)
-- Full simulation log: [docs/cre-workflow-log.txt](docs/cre-workflow-log.txt)
+- Full simulation output: [docs/cre-simulation-output.txt](docs/cre-simulation-output.txt)
 
 ---
 
@@ -483,23 +518,31 @@ require(collateralRatio >= requiredCollateral, "Insufficient collateral");
 ### For Institutional Risk Desks
 **Use Case:** For risk teams at firms like BlackRock and Fidelity monitoring DeFi exposure with enterprise-grade dashboards and audit trails.
 
-- ## 🔒 Privacy-Preserving Risk Analysis (NEW - Feb 16, 2026)
+## 🔒 Privacy-Preserving Risk Analysis
 
-DeRisk now uses **Chainlink Confidential HTTP** to protect proprietary risk data:
+DeRisk uses the **Chainlink secrets architecture** to protect proprietary risk data, with a clear path to full Confidential HTTP in production:
 
 **What's Protected:**
-- Anthropic API keys (stored in VaultDON, never exposed to DON nodes)
-- Risk model prompts (executed in TEE enclave)
-- AI responses (processed confidentially before consensus)
+- Anthropic API keys — stored in `secrets.json` locally, loaded via `runtime.getSecret()` from CRE; in production, fetched from VaultDON and injected into a TEE enclave
+- Risk model prompts — in production, executed inside the enclave via `ConfidentialHTTPClient`; raw AI responses never leave the enclave
+- No secrets in any committed file — `.env`, `secrets.json`, and `config.local.json` are all gitignored
 
-**Why This Matters:**
-DeFi protocols use proprietary risk models from credit agencies, institutional data providers, and internal metrics. Regular HTTP exposes API keys and responses to all DON nodes. Confidential HTTP isolates this in a Trusted Execution Environment (TEE).
+**Simulation vs Production:**
+```
+Simulation:
+[1] Fetch public data (DeFi Llama)  → HTTPClient
+[2] Load API key                    → runtime.getSecret() from secrets.json (gitignored)
+[3] Fetch AI risk score (Anthropic) → HTTPClient
+[4] Consensus + on-chain settlement → writeReport()
 
+Production (with VaultDON):
+[1] Fetch public data (DeFi Llama)  → HTTPClient
+[2] Load API key                    → runtime.getSecret() from VaultDON
+[3] Fetch AI risk score (Anthropic) → ConfidentialHTTPClient + TEE enclave
+[4] Consensus + on-chain settlement → writeReport()
 ```
-[1] Fetch public data (DeFi Llama) → HTTPClient
-[2] Fetch proprietary risk scores (Anthropic) → ConfidentialHTTPClient + TEE
-[3] Consensus on final risk score → on-chain settlement
-```
+
+**Why This Matters:** DeFi protocols use proprietary risk models. Regular HTTP exposes API keys and model responses to all DON nodes. The VaultDON + `ConfidentialHTTPClient` architecture executes the entire AI call inside a TEE — only the extracted numeric score exits the enclave.
 
 **Targets:** Privacy & Compliance prize category
 
@@ -548,7 +591,7 @@ Every file in this repository that directly uses a Chainlink service:
 - [contracts/abi/DeRiskOracle.ts](https://github.com/MaxWK96/derisk-protocol/blob/main/contracts/abi/DeRiskOracle.ts) — DeRiskOracle ABI consumed by CRE SDK and frontend
 
 **CRE Workflow**
-- [derisk-workflow/main.ts](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/main.ts) — CRE 5-step pipeline: `EVMClient` (Price Feeds), `ConfidentialHTTPClient` (Anthropic/TEE), `HTTPClient`, `writeReport()`
+- [derisk-workflow/main.ts](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/main.ts) — CRE 5-step pipeline: `EVMClient` (Price Feeds), `HTTPClient` (DeFi Llama + Anthropic), `writeReport()`; production uses `ConfidentialHTTPClient` for the Anthropic call via VaultDON
 - [derisk-workflow/workflow.yaml](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/workflow.yaml) — CRE workflow definition, triggers, and step configuration
 - [derisk-workflow/config.staging.json](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/config.staging.json) — Chainlink Price Feed address, oracle address, Automation schedule
 - [derisk-workflow/config.production.json](https://github.com/MaxWK96/derisk-protocol/blob/main/derisk-workflow/config.production.json) — production Price Feed and oracle configuration
