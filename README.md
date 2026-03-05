@@ -6,6 +6,7 @@
 
 [![Live Demo](https://img.shields.io/badge/Live-Demo-00b894?style=for-the-badge)](https://frontend-4b4fiyt5o-maxs-projects-64e484e7.vercel.app)
 [![Sepolia Contract](https://img.shields.io/badge/Sepolia-Contract-blue?style=for-the-badge)](https://sepolia.etherscan.io/address/0xbC75cCB19bc37a87bB0500c016bD13E50c591f09)
+[![YouTube Demo](https://img.shields.io/badge/YouTube-Demo-red?style=for-the-badge&logo=youtube)](https://www.youtube.com/watch?v=tx1b3JtV-d8)
 
 ---
 
@@ -36,6 +37,8 @@ CRE is the only component that makes this oracle possible. Every step runs insid
 - **`runtime.getSecret()`** — loads the Anthropic API key from CRE secrets (VaultDON in production), keeping it out of all committed config files
 
 The CRE cron trigger fires every 5 minutes. Without CRE, achieving DON-level consensus on multi-source off-chain data and writing it on-chain with cryptographic attestation would require building a custom oracle network from scratch.
+
+**Demo:** [Watch the full walkthrough on YouTube](https://www.youtube.com/watch?v=tx1b3JtV-d8)
 
 ---
 
@@ -662,6 +665,7 @@ contract YourProtocol {
 ## Links
 
 - **Live Demo:** [frontend-4b4fiyt5o-maxs-projects-64e484e7.vercel.app](https://frontend-4b4fiyt5o-maxs-projects-64e484e7.vercel.app)
+- **Demo Video:** [YouTube — Full Walkthrough](https://www.youtube.com/watch?v=tx1b3JtV-d8)
 - **Contract:** [0xbC75...1f09 on Sepolia](https://sepolia.etherscan.io/address/0xbC75cCB19bc37a87bB0500c016bD13E50c591f09)
 - **Backtesting Docs:** [docs/BACKTESTING.md](docs/BACKTESTING.md)
 
