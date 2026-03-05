@@ -3,7 +3,7 @@
 	"defiLlamaUrl": "https://api.llama.fi/tvl/aave-v3",
 	"evms": [
 		{
-			"oracleAddress": "0xbC75cCB19bc37a87bB0500c016bD13E50c591f09",
+			"oracleAddress": "0x79a5bAb12e5AB2D2Eaa9Fd3A76e87D3309388668",
 			"priceFeedAddress": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
 			"chainSelectorName": "ethereum-testnet-sepolia",
 			"gasLimit": "500000"

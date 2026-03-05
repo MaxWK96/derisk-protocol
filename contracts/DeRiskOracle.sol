@@ -104,17 +104,37 @@ contract DeRiskOracle {
 
     // ========== CRE Receiver Interface ==========
 
-    /// @notice Called by CRE writeReport - receives the consensus report
+    // Function selectors for dispatch
+    bytes4 private constant SEL_UPDATE_RISK_DATA =
+        bytes4(keccak256("updateRiskData(uint256,uint256,uint256,uint256)"));
+    bytes4 private constant SEL_UPDATE_CONTAGION =
+        bytes4(keccak256("updateContagionScore(uint256,uint256)"));
+
+    /// @notice Called by CRE writeReport - dispatches based on encoded function selector
     function onReport(bytes calldata /* metadata */, bytes calldata report) external {
-        // CRE reports include a 4-byte function selector prefix
-        bytes calldata payload = report.length > 4 ? report[4:] : report;
-        (
-            uint256 _riskScore,
-            uint256 _tvl,
-            uint256 _utilizationRate,
-            uint256 _ethPrice
-        ) = abi.decode(payload, (uint256, uint256, uint256, uint256));
-        _updateRiskData(_riskScore, _tvl, _utilizationRate, _ethPrice);
+        require(report.length >= 4, "Short report");
+        bytes4 selector = bytes4(report[:4]);
+        bytes calldata payload = report[4:];
+
+        if (selector == SEL_UPDATE_RISK_DATA) {
+            (
+                uint256 _riskScore,
+                uint256 _tvl,
+                uint256 _utilizationRate,
+                uint256 _ethPrice
+            ) = abi.decode(payload, (uint256, uint256, uint256, uint256));
+            _updateRiskData(_riskScore, _tvl, _utilizationRate, _ethPrice);
+        } else if (selector == SEL_UPDATE_CONTAGION) {
+            (uint256 _contagionScore, uint256 _worstCaseLoss) =
+                abi.decode(payload, (uint256, uint256));
+            require(_contagionScore <= 100, "Score must be 0-100");
+            contagionRiskScore = _contagionScore;
+            worstCaseSystemLoss = _worstCaseLoss;
+            contagionLastUpdated = block.timestamp;
+            emit ContagionScoreUpdated(_contagionScore, _worstCaseLoss, block.timestamp);
+        } else {
+            revert("Unknown selector");
+        }
     }
 
     /// @notice Direct update function for CRE workflow and testing
