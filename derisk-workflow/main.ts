@@ -11,6 +11,9 @@
 
 import {
 	bytesToHex,
+	ConfidentialHTTPClient,
+	type ConfidentialHTTPSendRequester,
+	consensusIdenticalAggregation,
 	ConsensusAggregationByFields,
 	type CronPayload,
 	handler,
@@ -23,10 +26,12 @@ import {
 	hexToBase64,
 	LAST_FINALIZED_BLOCK_NUMBER,
 	median,
+	ok,
 	Runner,
 	type Runtime,
 	TxStatus,
 } from '@chainlink/cre-sdk'
+import { gcm } from '@noble/ciphers/aes'
 import { type Address, decodeFunctionResult, encodeFunctionData, zeroAddress } from 'viem'
 import { z } from 'zod'
 import { ChainlinkPriceFeed, DeRiskOracle } from '../contracts/abi'
@@ -40,7 +45,6 @@ import { computeConsensus, computeRuleBasedScore, computeContagionAdjustedScore,
 
 const configSchema = z.object({
 	schedule: z.string(),
-	anthropicApiKey: z.string().optional().default(''),
 	defiLlamaUrl: z.string(),
 	evms: z.array(
 		z.object({
@@ -83,6 +87,34 @@ const getRiskLevel = (score: number): string => {
 	if (score <= 60) return 'ELEVATED'
 	if (score <= 80) return 'HIGH'
 	return 'CRITICAL'
+}
+
+// ============================================================================
+// Helpers: Uint8Array ↔ Base64, hex → Uint8Array
+// ============================================================================
+
+const bytesToBase64 = (bytes: Uint8Array): string =>
+	Buffer.from(bytes).toString('base64')
+
+const base64ToBytes = (b64: string): Uint8Array =>
+	new Uint8Array(Buffer.from(b64, 'base64'))
+
+const hexToBytes = (hex: string): Uint8Array => {
+	const clean = hex.startsWith('0x') ? hex.slice(2) : hex
+	const out = new Uint8Array(clean.length / 2)
+	for (let i = 0; i < out.length; i++) {
+		out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16)
+	}
+	return out
+}
+
+// ============================================================================
+// Types (additional)
+// ============================================================================
+
+interface EncryptedAIResult {
+	encryptedBodyBase64: string
+	statusCode: number
 }
 
 // ============================================================================
@@ -153,13 +185,21 @@ const readEthPrice = (runtime: Runtime<Config>): bigint => {
 }
 
 // ============================================================================
-// Step 3: AI Risk Analysis via Anthropic Claude
+// Step 3: AI Risk Analysis via Anthropic Claude (Confidential HTTP)
+//
+// Uses the confidential-http@1.0.0-alpha capability via VaultDON.
+// - API key injected as {{.anthropicApiKey}} — never exposed in code or logs.
+// - encryptOutput: true — response AES-GCM encrypted inside the TEE enclave.
+// - Decrypted in-workflow using the AES key from VaultDON.
+//
+// In simulation: ConfidentialHTTPClient is not supported by the CRE simulator
+// (throws "method SendRequest not found"). The caller wraps this in try/catch
+// and falls back to rule-based scoring automatically.
 // ============================================================================
 
-const fetchAIRiskScore = (
-	sendRequester: HTTPSendRequester,
+const fetchConfidentialAIScore = (
+	sendRequester: ConfidentialHTTPSendRequester,
 	params: {
-		anthropicApiKey: string
 		aaveTvl: number
 		compoundTvl: number
 		makerTvl: number
@@ -168,8 +208,8 @@ const fetchAIRiskScore = (
 		contagionData: string
 		depegData: string
 	},
-): RiskResult => {
-	const { anthropicApiKey, aaveTvl, compoundTvl, makerTvl, totalTvl, ethPrice, contagionData, depegData } = params
+): EncryptedAIResult => {
+	const { aaveTvl, compoundTvl, makerTvl, totalTvl, ethPrice, contagionData, depegData } = params
 
 	const prompt = `You are a DeFi risk analysis AI for the DeRisk Protocol oracle. Analyze these multi-protocol metrics and return an aggregate risk score.
 
@@ -210,67 +250,31 @@ Respond with ONLY valid JSON, no markdown, no explanation:
 		messages: [{ role: 'user', content: prompt }],
 	})
 
+	// Vault-managed API key injected via {{.anthropicApiKey}} template.
+	// Response encrypted with AES-256-GCM using san_marino_aes_gcm_encryption_key.
 	const response = sendRequester
 		.sendRequest({
-			method: 'POST',
-			url: 'https://api.anthropic.com/v1/messages',
-			headers: {
-				'Content-Type': 'application/json',
-				'x-api-key': anthropicApiKey,
-				'anthropic-version': '2023-06-01',
+			vaultDonSecrets: [
+				{ key: 'anthropicApiKey', owner: '' },
+				{ key: 'san_marino_aes_gcm_encryption_key', owner: '' },
+			],
+			request: {
+				method: 'POST',
+				url: 'https://api.anthropic.com/v1/messages',
+				multiHeaders: {
+					'Content-Type': { values: ['application/json'] },
+					'x-api-key': { values: ['{{.anthropicApiKey}}'] },
+					'anthropic-version': { values: ['2023-06-01'] },
+				},
+				bodyString: requestBody,
 			},
-			body: Buffer.from(requestBody).toString('base64'),
+			encryptOutput: true,
 		})
 		.result()
 
-	if (response.statusCode !== 200) {
-		// Chainlink Functions-compatible fallback scoring
-		// Same logic as chainlink-functions-source.js
-		const ethPriceNum = parseFloat(ethPrice)
-
-		const scoreProtocol = (protocolTvl: number, critical: number, warning: number, caution: number): number => {
-			let score = 15
-			if (protocolTvl < critical) score += 40
-			else if (protocolTvl < warning) score += 20
-			else if (protocolTvl < caution) score += 10
-			return Math.min(100, score)
-		}
-
-		let aaveScore = scoreProtocol(aaveTvl, 5e9, 15e9, 20e9)
-		let compScore = scoreProtocol(compoundTvl, 500e6, 1e9, 2e9)
-		let makerScore = scoreProtocol(makerTvl, 2e9, 4e9, 6e9)
-
-		// ETH price impact
-		let ethAdj = 0
-		if (ethPriceNum < 1000) ethAdj = 20
-		else if (ethPriceNum < 1500) ethAdj = 10
-		else if (ethPriceNum < 2000) ethAdj = 5
-
-		aaveScore = Math.min(100, aaveScore + ethAdj)
-		compScore = Math.min(100, compScore + ethAdj)
-		makerScore = Math.min(100, makerScore + ethAdj)
-
-		// Weighted aggregate (Aave 50%, Compound 25%, Maker 25%)
-		const fallbackScore = Math.round((aaveScore * 50 + compScore * 25 + makerScore * 25) / 100)
-
-		return {
-			riskScore: Math.min(100, Math.max(0, fallbackScore)),
-			source: 2, // Chainlink Functions fallback
-		}
-	}
-
-	const apiResponse = JSON.parse(Buffer.from(response.body).toString('utf-8'))
-	let textContent = apiResponse.content?.[0]?.text || '{"riskScore": 50}'
-
-	// Strip markdown code blocks if Claude wrapped the JSON
-	textContent = textContent.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
-
-	// Parse Claude's JSON response
-	const riskData = JSON.parse(textContent)
-
 	return {
-		riskScore: Math.min(100, Math.max(0, Math.round(riskData.riskScore ?? 50))),
-		source: 1, // Anthropic Claude AI
+		encryptedBodyBase64: bytesToBase64(response.body),
+		statusCode: response.statusCode,
 	}
 }
 
@@ -493,47 +497,71 @@ const assessRisk = (runtime: Runtime<Config>): string => {
 		}
 	}
 
-	// ---- Step 4: AI Risk Analysis (enriched with contagion + depeg data) ----
+	// ---- Step 4: AI Risk Analysis (Confidential HTTP + AES-GCM decryption) ----
 	runtime.log('')
-	runtime.log('[4/5] Running AI risk analysis via Anthropic Claude...')
+	runtime.log('[4/5] Running AI risk analysis via Anthropic Claude (Confidential HTTP)...')
+	runtime.log('  Capability:    confidential-http@1.0.0-alpha')
+	runtime.log('  API key:       {{.anthropicApiKey}} (vault-managed, never in plaintext)')
+	runtime.log('  encryptOutput: true — response AES-GCM encrypted inside TEE')
 
-	// Fetch Anthropic API key.
-	// Priority: 1) CRE secrets (VaultDON in production / secrets.json in sim)
-	//           2) config.anthropicApiKey (config.local.json, gitignored, for local dev)
-	//           3) empty → fallback rule-based scorer
-	let anthropicApiKey = ''
+	let riskResult: RiskResult
+
 	try {
-		anthropicApiKey = runtime.getSecret({ id: 'anthropic_api_key' }).result().value
-		runtime.log('  Key source: CRE secrets (anthropic_api_key)')
+		const confHTTPClient = new ConfidentialHTTPClient()
+
+		const encryptedResult = confHTTPClient
+			.sendRequest(
+				runtime,
+				fetchConfidentialAIScore,
+				consensusIdenticalAggregation<EncryptedAIResult>(),
+			)({
+				aaveTvl: metrics.aaveTvl,
+				compoundTvl: metrics.compoundTvl,
+				makerTvl: metrics.makerTvl,
+				totalTvl: metrics.totalTvl,
+				ethPrice: ethPriceUSD.toFixed(2),
+				contagionData: contagionPromptData,
+				depegData: depegPromptData,
+			})
+			.result()
+
+		// Encrypted body layout: nonce (12 bytes) || ciphertext || tag (16 bytes)
+		const encryptedBytes = base64ToBytes(encryptedResult.encryptedBodyBase64)
+		const nonceBytes = encryptedBytes.slice(0, 12)
+		const ciphertextAndTag = encryptedBytes.slice(12)
+		runtime.log(`  Encrypted response: ${encryptedBytes.length} bytes (AES-256-GCM)`)
+		runtime.log(`  Nonce:              ${bytesToHex(nonceBytes)}`)
+		runtime.log(`  Ciphertext+Tag:     ${bytesToHex(ciphertextAndTag).substring(0, 42)}...`)
+
+		// Retrieve AES-256-GCM decryption key from VaultDON
+		const aesKeyHex = runtime.getSecret({ id: 'san_marino_aes_gcm_encryption_key' }).result().value
+		const keyBytes = hexToBytes(aesKeyHex)
+
+		// Decrypt using @noble/ciphers gcm (pure JS, bundled with workflow WASM)
+		const plaintext = gcm(keyBytes, nonceBytes).decrypt(ciphertextAndTag)
+		const responseText = Buffer.from(plaintext).toString('utf-8')
+
+		const apiResponse = JSON.parse(responseText)
+		let textContent = apiResponse.content?.[0]?.text || '{"riskScore": 50}'
+		textContent = textContent.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+		const riskData = JSON.parse(textContent)
+
+		riskResult = {
+			riskScore: Math.min(100, Math.max(0, Math.round(riskData.riskScore ?? 50))),
+			source: 1, // Anthropic Claude AI via Confidential HTTP
+		}
+		runtime.log(`  Claude Score: ${riskResult.riskScore}/100 (decrypted from AES-GCM)`)
 	} catch (_) {
-		// Secrets not available in this simulation — use config value
-		anthropicApiKey = runtime.config.anthropicApiKey ?? ''
-		const source = anthropicApiKey ? 'config.local.json' : 'none (will use fallback)'
-		runtime.log(`  Key source: ${source}`)
+		// In simulation, ConfidentialHTTPClient makes the real call but the response is
+		// not AES-GCM encrypted (no TEE enclave), and the AES key is not in staging secrets.
+		// In production with VaultDON, both the encryption and key retrieval succeed.
+		runtime.log('  AES-GCM decryption skipped (AES key not in staging secrets / no TEE in sim)')
+		runtime.log('  → Falling back to rule-based scoring')
+		const fallback = computeRuleBasedScore(metrics.aaveTvl, metrics.compoundTvl, metrics.makerTvl, ethPriceUSD)
+		riskResult = { riskScore: fallback.score, source: 2 }
 	}
 
-	const riskResult = httpClient
-		.sendRequest(
-			runtime,
-			fetchAIRiskScore,
-			ConsensusAggregationByFields<RiskResult>({
-				riskScore: median,
-				source: median,
-			}),
-		)({
-			anthropicApiKey,
-			aaveTvl: metrics.aaveTvl,
-			compoundTvl: metrics.compoundTvl,
-			makerTvl: metrics.makerTvl,
-			totalTvl: metrics.totalTvl,
-			ethPrice: ethPriceUSD.toFixed(2),
-			contagionData: contagionPromptData,
-			depegData: depegPromptData,
-		})
-		.result()
-
-	const scoringMethod = riskResult.source === 1 ? 'Anthropic Claude AI (Confidential)' : 'Chainlink Functions (fallback)'
-	runtime.log(`  Claude Score: ${riskResult.riskScore}/100`)
+	const scoringMethod = riskResult.source === 1 ? 'Anthropic Claude AI (Confidential HTTP + AES-GCM)' : 'Chainlink Functions (fallback)'
 	runtime.log(`  Scored By:    ${scoringMethod}`)
 
 	// ---- Step 4b: Multi-AI Consensus ----

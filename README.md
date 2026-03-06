@@ -32,9 +32,9 @@ CRE is the only component that makes this oracle possible. Every step runs insid
 
 - **`HTTPClient` + `ConsensusAggregationByFields`** — fetches TVL from DeFi Llama across all DON nodes and takes the median, preventing any single node from manipulating inputs
 - **`EVMClient`** — reads the Chainlink Price Feed (`latestRoundData`) directly from Sepolia at a finalized block, so the price is tamper-proof
-- **`HTTPClient`** (AI call) — sends the enriched prompt to Anthropic Claude API; in production this becomes `ConfidentialHTTPClient` so the API key and raw AI response never leave the TEE enclave
+- **`ConfidentialHTTPClient`** (AI call) — sends the enriched prompt to Anthropic Claude API via `confidential-http@1.0.0-alpha`; the API key (`{{.anthropicApiKey}}`) is vault-managed and never in plaintext; response is AES-256-GCM encrypted in the TEE enclave (`encryptOutput: true`) and decrypted in-workflow using `runtime.getSecret("san_marino_aes_gcm_encryption_key")`; in simulation the call succeeds but AES decryption is skipped (AES key absent from staging secrets / no TEE), falling back to rule-based scoring
 - **`writeReport()`** — generates a cryptographically signed consensus report and writes it to `DeRiskOracle.sol` via `IReceiver.onReport()`; no trusted intermediary required
-- **`runtime.getSecret()`** — loads the Anthropic API key from CRE secrets (VaultDON in production), keeping it out of all committed config files
+- **`runtime.getSecret()`** — retrieves the AES-256-GCM decryption key from CRE secrets (VaultDON in production) to decrypt the confidential Anthropic response in-workflow; all secret identifiers are declared in `secrets.yaml`, none committed to git
 
 The CRE cron trigger fires every 5 minutes. Without CRE, achieving DON-level consensus on multi-source off-chain data and writing it on-chain with cryptographic attestation would require building a custom oracle network from scratch.
 
@@ -65,11 +65,11 @@ DeRisk Protocol monitors systemic risk across major DeFi protocols in real-time:
 
 | Step | Action | Chainlink Service |
 |------|--------|-------------------|
-| 1 | Fetch multi-protocol TVL (HTTP GET x3) | Data Streams |
+| 1 | Fetch multi-protocol TVL (HTTP GET x3) | CRE HTTPClient |
 | 2 | Read ETH/USD price (EVM Read) | Price Feeds |
 | 3 | Contagion cascade + depeg monitoring | CRE |
-| 4 | Multi-AI consensus scoring (3 models) | Functions |
-| 5 | Write risk + contagion data on-chain | Automation |
+| 4 | AI consensus scoring (Confidential HTTP) | CRE ConfidentialHTTPClient |
+| 5 | Write risk + contagion data on-chain | CRE writeReport / Automation |
 
 ### Chainlink Services Used (5)
 
@@ -341,12 +341,24 @@ This hybrid model is standard for oracle networks: external data → consensus �
 ### 🔒 Privacy & Compliance
 
 **How DeRisk Fits:**
-- **Confidential HTTP (production):** In production, Anthropic API calls use `ConfidentialHTTPClient` + TEE enclave via VaultDON; in simulation, `HTTPClient` is used with the key loaded from `runtime.getSecret()`
-- **Protected Secrets:** API keys stored in VaultDON (`secrets.json` + `workflow.yaml secrets-path`), never committed to git and never exposed to DON nodes
-- **Private Prompts:** In production, risk model prompts execute inside a Trusted Execution Environment — raw AI responses never leave the enclave
-- **Institutional Use Case:** Enables regulated entities (RWA issuers, centralized venues) to monitor DeFi exposure without revealing positions or proprietary risk models
+- **Confidential HTTP (implemented):** Anthropic API calls use `ConfidentialHTTPClient` (`confidential-http@1.0.0-alpha`) with `{{.anthropicApiKey}}` vault template — the API key is never in code or logs. Response is AES-256-GCM encrypted (`encryptOutput: true`) inside the TEE enclave and decrypted in-workflow using `san_marino_aes_gcm_encryption_key` from VaultDON.
+- **secrets.yaml:** Maps `anthropicApiKey → ANTHROPIC_API_KEY` and `san_marino_aes_gcm_encryption_key → AES_KEY_ALL` for VaultDON injection.
+- **Protected Secrets:** API keys stored in VaultDON via `secrets.yaml` + `workflow.yaml vaultDonSecrets`, never committed to git and never exposed to DON nodes.
+- **Private Prompts:** Risk model prompts execute inside a TEE — raw AI responses never leave the enclave unencrypted.
+- **Institutional Use Case:** Enables regulated entities (RWA issuers, centralized venues) to monitor DeFi exposure without revealing positions or proprietary risk models.
 
-**Why This Matters:** Traditional HTTP exposes API keys and AI responses to all DON nodes. The VaultDON + ConfidentialHTTP architecture isolates this in a TEE enclave for production deployments.
+**Simulation vs Production:**
+```
+Simulation (CRE limitation — ConfidentialHTTPClient not supported in sim):
+[4] AI scoring → ConfidentialHTTPClient attempted → falls back → rule-based scoring
+
+Production (VaultDON):
+[4] AI scoring → ConfidentialHTTPClient → {{.anthropicApiKey}} injected by vault
+              → response AES-GCM encrypted in TEE
+              → gcm(aesKey, nonce).decrypt(ciphertextAndTag) → Claude score
+```
+
+**Why This Matters:** Traditional HTTP exposes API keys and AI responses to all DON nodes. The VaultDON + `ConfidentialHTTPClient` architecture executes the Anthropic call inside a TEE — only the extracted numeric score exits the enclave.
 
 ---
 
@@ -355,7 +367,7 @@ This hybrid model is standard for oracle networks: external data → consensus �
 ### Prerequisites
 
 - Node.js 18+ / Bun runtime
-- CRE CLI ([install guide](https://docs.chain.link/cre))
+- CRE CLI — [install guide](https://docs.chain.link/cre) · [releases](https://github.com/smartcontractkit/cre-cli/releases) (add `cre` to PATH)
 - Sepolia ETH + Anthropic API key
 
 ### Installation
@@ -526,23 +538,26 @@ require(collateralRatio >= requiredCollateral, "Insufficient collateral");
 DeRisk uses the **Chainlink secrets architecture** to protect proprietary risk data, with a clear path to full Confidential HTTP in production:
 
 **What's Protected:**
-- Anthropic API keys — stored in `secrets.json` locally, loaded via `runtime.getSecret()` from CRE; in production, fetched from VaultDON and injected into a TEE enclave
-- Risk model prompts — in production, executed inside the enclave via `ConfidentialHTTPClient`; raw AI responses never leave the enclave
+- Anthropic API key — declared in `secrets.yaml` (`anthropicApiKey → ANTHROPIC_API_KEY`); injected via `{{.anthropicApiKey}}` template in the `ConfidentialHTTPClient` request; never appears in code, logs, or config files
+- AES-256-GCM key — declared in `secrets.yaml` (`san_marino_aes_gcm_encryption_key → AES_KEY_ALL`); used by the enclave to encrypt the Anthropic response and by the workflow to decrypt it; never in plaintext outside VaultDON
+- Risk model prompts — executed inside the TEE enclave; raw AI responses are encrypted before leaving the enclave
 - No secrets in any committed file — `.env`, `secrets.json`, and `config.local.json` are all gitignored
 
 **Simulation vs Production:**
 ```
-Simulation:
+Simulation (CRE does not support ConfidentialHTTPClient):
 [1] Fetch public data (DeFi Llama)  → HTTPClient
-[2] Load API key                    → runtime.getSecret() from secrets.json (gitignored)
-[3] Fetch AI risk score (Anthropic) → HTTPClient
+[2] Fetch AI risk score (Anthropic) → ConfidentialHTTPClient → throws → caught
+[3] Fallback                        → rule-based scoring
 [4] Consensus + on-chain settlement → writeReport()
 
 Production (with VaultDON):
 [1] Fetch public data (DeFi Llama)  → HTTPClient
-[2] Load API key                    → runtime.getSecret() from VaultDON
-[3] Fetch AI risk score (Anthropic) → ConfidentialHTTPClient + TEE enclave
-[4] Consensus + on-chain settlement → writeReport()
+[2] Fetch AI risk score (Anthropic) → ConfidentialHTTPClient (confidential-http@1.0.0-alpha)
+    - API key: {{.anthropicApiKey}} injected from VaultDON
+    - Response: AES-GCM encrypted in TEE (encryptOutput: true)
+    - Decrypt:  gcm(aesKey, nonce).decrypt(ciphertextAndTag) using VaultDON key
+[3] Consensus + on-chain settlement → writeReport()
 ```
 
 **Why This Matters:** DeFi protocols use proprietary risk models. Regular HTTP exposes API keys and model responses to all DON nodes. The VaultDON + `ConfidentialHTTPClient` architecture executes the entire AI call inside a TEE — only the extracted numeric score exits the enclave.

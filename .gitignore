@@ -12,6 +12,7 @@ cache/
 .env
 .env.*
 secrets.yaml
+secrets.staging.yaml
 **/secrets.json
 **/config.local.json
 *.local

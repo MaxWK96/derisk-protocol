@@ -2,7 +2,7 @@
 # DeRisk Protocol - CRE Workflow Settings
 # ==========================================================================
 # AI-Powered DeFi Risk Oracle for Chainlink Convergence Hackathon 2026
-# Monitors Aave V3, runs Claude AI risk analysis, writes on-chain
+# Monitors Aave V3, runs Claude AI risk analysis via Confidential HTTP, writes on-chain
 
 # ==========================================================================
 staging-settings:
@@ -11,7 +11,10 @@ staging-settings:
   workflow-artifacts:
     workflow-path: "./main.ts"
     config-path: "./config.staging.json"
-    secrets-path: "./secrets.json"
+    secrets-path: "../secrets.staging.yaml"
+  vaultDonSecrets:
+    - key: anthropicApiKey
+      owner: ""
 
 # ==========================================================================
 # Local development target: uses config.local.json (gitignored) which holds
@@ -23,7 +26,10 @@ local-settings:
   workflow-artifacts:
     workflow-path: "./main.ts"
     config-path: "./config.local.json"
-    secrets-path: "./secrets.json"
+    secrets-path: "../secrets.staging.yaml"
+  vaultDonSecrets:
+    - key: anthropicApiKey
+      owner: ""
 
 # ==========================================================================
 production-settings:
@@ -32,4 +38,9 @@ production-settings:
   workflow-artifacts:
     workflow-path: "./main.ts"
     config-path: "./config.production.json"
-    secrets-path: "./secrets.json"
+    secrets-path: "../secrets.yaml"
+  vaultDonSecrets:
+    - key: anthropicApiKey
+      owner: ""
+    - key: san_marino_aes_gcm_encryption_key
+      owner: ""
